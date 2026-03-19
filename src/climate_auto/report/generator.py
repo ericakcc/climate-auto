@@ -114,4 +114,10 @@ async def generate_report(
     output_path.write_text(rendered, encoding="utf-8")
     logger.info("Report generated: {}", output_path)
 
+    # Generate DOCX report from the rendered Markdown
+    from climate_auto.report.docx_exporter import generate_docx_from_markdown
+
+    docx_path = generate_docx_from_markdown(output_path, report_dir)
+    logger.info("DOCX report generated: {}", docx_path)
+
     return output_path
