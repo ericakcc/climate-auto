@@ -8,6 +8,15 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 
+class AnalyzerConfig(BaseModel):
+    """LLM chart analyzer configuration."""
+
+    enabled: bool = False
+    model: str = "claude-sonnet-4-6"
+    max_turns: int = 15
+    budget_limit_usd: float = 5.0
+
+
 class BrowserConfig(BaseModel):
     """Playwright browser configuration."""
 
@@ -152,6 +161,7 @@ class Settings(BaseSettings):
     max_concurrent_downloads: int = 3
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
+    analyzer: AnalyzerConfig = Field(default_factory=AnalyzerConfig)
 
 
 def load_settings(config_path: Path | None = None) -> Settings:

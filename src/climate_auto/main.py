@@ -1,5 +1,7 @@
 """CLI entry point and orchestrator for daily weather data collection."""
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 from datetime import date, datetime, timedelta, timezone
@@ -17,6 +19,8 @@ from climate_auto.scrapers.cwa_upper import CwaUpperAirScraper
 from climate_auto.scrapers.ncdr_corrdiff import NcdrCorrdiffScraper
 from climate_auto.scrapers.ncdr_dwp import NcdrDwpScraper
 from climate_auto.scrapers.ncdr_ecmwf import NcdrEcmwfScraper
+from climate_auto.report.analyzer import BaseAnalyzer
+from climate_auto.report.generator import generate_report
 from climate_auto.report_selector import build_report_folder
 from climate_auto.storage import ensure_source_dir, save_manifest
 
@@ -106,6 +110,7 @@ async def run_collection(
     target_date: date,
     settings: Settings,
     sources: list[SourceName] | None = None,
+    analyzer: "BaseAnalyzer | None" = None,
 ) -> CollectionManifest:
     """Run data collection for the given date.
 
@@ -162,6 +167,12 @@ async def run_collection(
     report_dir = build_report_folder(settings.data_dir, target_date)
     logger.info("Report folder: {}", report_dir)
 
+    # Generate Markdown report
+    report_path = await generate_report(
+        settings.data_dir, target_date, analyzer=analyzer
+    )
+    logger.info("Report generated: {}", report_path)
+
     return manifest
 
 
@@ -187,6 +198,18 @@ def main() -> None:
         default=None,
         help="Specific sources to run (e.g., ncdr_ecmwf cwa_main).",
     )
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        default=False,
+        help="Skip data collection; generate report from existing data.",
+    )
+    parser.add_argument(
+        "--analyze",
+        action="store_true",
+        default=False,
+        help="Enable LLM chart analysis using Claude Agent SDK.",
+    )
     args = parser.parse_args()
 
     # Determine target date
@@ -211,7 +234,21 @@ def main() -> None:
         retention="30 days",
     )
 
-    asyncio.run(run_collection(target_date, settings, sources))
+    # Initialize analyzer if requested
+    analyzer = None
+    if args.analyze or settings.analyzer.enabled:
+        from climate_auto.report.claude_analyzer import ClaudeAnalyzer
+
+        analyzer = ClaudeAnalyzer(settings.analyzer)
+        logger.info("LLM analyzer enabled (model={})", settings.analyzer.model)
+
+    if args.report_only:
+        report_path = asyncio.run(
+            generate_report(settings.data_dir, target_date, analyzer=analyzer)
+        )
+        logger.info("Report-only mode complete: {}", report_path)
+    else:
+        asyncio.run(run_collection(target_date, settings, sources, analyzer=analyzer))
 
 
 if __name__ == "__main__":

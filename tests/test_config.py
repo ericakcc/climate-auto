@@ -20,9 +20,7 @@ def test_load_settings_default() -> None:
 
 def test_load_settings_from_yaml(tmp_path: Path) -> None:
     config_file = tmp_path / "test_settings.yaml"
-    config_file.write_text(
-        "max_retries: 5\nrequest_timeout_seconds: 60.0\n"
-    )
+    config_file.write_text("max_retries: 5\nrequest_timeout_seconds: 60.0\n")
     s = load_settings(config_file)
     assert s.max_retries == 5
     assert s.request_timeout_seconds == 60.0
