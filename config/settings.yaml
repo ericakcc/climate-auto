@@ -1,0 +1,51 @@
+data_dir: "./data"
+timezone: "Asia/Taipei"
+max_retries: 3
+retry_delay_seconds: 2.0
+request_timeout_seconds: 30.0
+max_concurrent_downloads: 3
+
+browser:
+  headless: true
+  viewport_width: 1920
+  viewport_height: 1080
+
+sources:
+  ncdr_ecmwf:
+    enabled: true
+    variables:
+      - "500"
+      - "850"
+      - "850mf"
+      - "700"
+      - "200"
+      - "1000"
+      - "8530"
+    forecast_hours: [0, 24, 48]
+    daily_rain_days: [1, 2, 3]
+
+  ncdr_dwp:
+    enabled: true
+    variables:
+      - "500"
+      - "850"
+      - "QV850"
+    forecast_hours: [0, 24, 48]
+
+  ncdr_corrdiff:
+    enabled: true
+    parameters:
+      - "radar_wind"
+      - "tw_t2m"
+      - "sp"
+      - "rr"
+    forecast_hours: [0, 6, 12, 24, 48]
+
+  cwa_main:
+    enabled: true
+    satellite_types:
+      - "LCC_IR1_CR_2750"
+      - "LCC_TRGB_1000"
+
+  cwa_marine:
+    enabled: true
