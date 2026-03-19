@@ -1,0 +1,35 @@
+# TACOCO 天氣討論會 - {{ ctx.date }}
+
+> 自動產生於 {{ ctx.generated_at.strftime('%Y-%m-%d %H:%M') }}
+>
+> 報告圖片: {{ ctx.summary.total_in_report }} 張 | 下載成功: {{ ctx.summary.total_downloaded }} 張
+
+---
+
+{% for section in ctx.sections %}
+## {{ loop.index }}. {{ section.title }}
+
+{% for subsection in section.subsections %}
+### {{ loop.index | roman }}. {{ subsection.title }}
+
+{% for chart in subsection.charts %}
+![{{ chart.description }}]({{ chart.relative_path }})
+
+{% if chart.analysis %}
+{{ chart.analysis }}
+{% else %}
+*待分析*
+{% endif %}
+
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% if ctx.summary.missing_patterns %}
+---
+
+## 缺少的資料
+
+{% for pattern in ctx.summary.missing_patterns %}
+- `{{ pattern }}`
+{% endfor %}
+{% endif %}
