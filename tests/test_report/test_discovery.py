@@ -30,7 +30,7 @@ def _create_fake_report(tmp_path: Path) -> Path:
     analysis_dir = report_dir / "1_review" / "analysis"
     analysis_dir.mkdir(parents=True)
     (analysis_dir / "ECMWF500_20260319_f000.gif").write_bytes(b"GIF89a")
-    (analysis_dir / "ECMWF850_20260319_f000.gif").write_bytes(b"GIF89a")
+    (analysis_dir / "ECMWF850mf_20260319_f000.gif").write_bytes(b"GIF89a")
 
     # Section 1: sounding
     sounding_dir = report_dir / "1_review" / "sounding"

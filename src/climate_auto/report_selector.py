@@ -14,12 +14,11 @@ REPORT_FILE_MAPPING: list[tuple[str, str, str, str]] = [
     # === Section 1: Daily review (當日回顧) ===
     # I. Analysis field (分析場)
     ("1_review/analysis", "ncdr_ecmwf", "ECMWF500_*_f000.gif", "500hPa analysis"),
-    ("1_review/analysis", "ncdr_ecmwf", "ECMWF850_*_f000.gif", "850hPa wind analysis"),
     (
         "1_review/analysis",
         "ncdr_ecmwf",
         "ECMWF850mf_*_f000.gif",
-        "850hPa moisture flux analysis",
+        "850hPa wind & water vapor flux analysis",
     ),
     ("1_review/analysis", "ncdr_ecmwf", "ECMWF700_*_f000.gif", "700hPa analysis"),
     # II. Sounding (探空)
@@ -41,8 +40,12 @@ REPORT_FILE_MAPPING: list[tuple[str, str, str, str]] = [
     ("1_review/upperair", "cwa_upper", "upperair_500hPa_*.gif", "CWA 500hPa analysis"),
     # === Section 2: f24h forecast (f24h預報再確認) ===
     ("2_f24h", "ncdr_ecmwf", "ECMWF500_*_f024.gif", "500hPa +24h forecast"),
-    ("2_f24h", "ncdr_ecmwf", "ECMWF850_*_f024.gif", "850hPa wind +24h"),
-    ("2_f24h", "ncdr_ecmwf", "ECMWF850mf_*_f024.gif", "850hPa moisture flux +24h"),
+    (
+        "2_f24h",
+        "ncdr_ecmwf",
+        "ECMWF850mf_*_f024.gif",
+        "850hPa wind & water vapor flux +24h",
+    ),
     ("2_f24h", "ncdr_ecmwf", "ECMWF700_*_f024.gif", "700hPa +24h"),
     ("2_f24h", "ncdr_ecmwf", "dailyrn_*_1.png", "ECMWF daily rain day 1"),
     ("2_f24h", "ncdr_ecmwf", "dailyensrn_*_1_fdmx.png", "ECMWF ensemble rain day 1"),
@@ -50,8 +53,12 @@ REPORT_FILE_MAPPING: list[tuple[str, str, str, str]] = [
     # I. WPSH (太平洋高壓)
     ("3_f48h", "ncdr_ecmwf", "ECMWF500_*_f048.gif", "500hPa +48h forecast"),
     # II. Moisture transport & low-level wind
-    ("3_f48h", "ncdr_ecmwf", "ECMWF850_*_f048.gif", "850hPa wind +48h"),
-    ("3_f48h", "ncdr_ecmwf", "ECMWF850mf_*_f048.gif", "850hPa moisture flux +48h"),
+    (
+        "3_f48h",
+        "ncdr_ecmwf",
+        "ECMWF850mf_*_f048.gif",
+        "850hPa wind & water vapor flux +48h",
+    ),
     ("3_f48h", "ncdr_ecmwf", "ECMWF700_*_f048.gif", "700hPa +48h"),
     ("3_f48h", "ncdr_ecmwf", "dailyrn_*_2.png", "ECMWF daily rain day 2"),
     ("3_f48h", "ncdr_ecmwf", "dailyensrn_*_2_fdmx.png", "ECMWF ensemble rain day 2"),
