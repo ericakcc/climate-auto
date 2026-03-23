@@ -22,6 +22,8 @@ report_content.md
 # Word temp files
 ~$*.docx
 
-# Reference materials (local only)
+# Local documents & reference materials
+*.docx
 Skew-T-Manual.pdf
 skew-t-analysis.skill
+data_source.md
