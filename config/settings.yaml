@@ -50,6 +50,16 @@ sources:
   cwa_marine:
     enabled: true
 
+  # CWA upper-air (sounding, surface/upper charts).
+  # Default off: per PROGRESS.md the upper-chart endpoints often 404.
+  cwa_upper:
+    enabled: false
+
+  # Australian BOM MJO products.
+  # Default off: per PROGRESS.md the BOM endpoints currently return 403.
+  bom_mjo:
+    enabled: false
+
 analyzer:
   enabled: false
   model: "claude-sonnet-4-6"

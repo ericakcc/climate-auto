@@ -331,9 +331,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
 
         # Process non-Skew-T charts with standard single-pass flow
         if other_charts:
-            batch_results = await self._analyze_standard_batch(
-                other_charts, section_context
-            )
+            batch_results = await self._analyze_standard_batch(other_charts, section_context)
             results.update(batch_results)
 
         # Process Skew-T charts with two-pass flow
@@ -439,23 +437,17 @@ class ClaudeAnalyzer(BaseAnalyzer):
                     extracted_text = message.result
 
             if not extracted_text:
-                logger.warning(
-                    "Skew-T extraction returned empty for '{}'", chart.relative_path
-                )
+                logger.warning("Skew-T extraction returned empty for '{}'", chart.relative_path)
                 return ""
 
             logger.info("Skew-T extraction complete for '{}'", chart.relative_path)
 
         except Exception as e:
-            logger.error(
-                "Skew-T extraction failed for '{}': {}", chart.relative_path, e
-            )
+            logger.error("Skew-T extraction failed for '{}': {}", chart.relative_path, e)
             return ""
 
         # --- Pass 2: Meteorological analysis ---
-        analysis_prompt = _build_skewt_analysis_prompt(
-            chart.relative_path, extracted_text
-        )
+        analysis_prompt = _build_skewt_analysis_prompt(chart.relative_path, extracted_text)
         skewt_analysis_prompt = _load_skewt_analysis_prompt()
         try:
             analysis_text = ""
@@ -479,9 +471,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
             if analysis:
                 logger.info("Skew-T analysis complete for '{}'", chart.relative_path)
             else:
-                logger.warning(
-                    "Skew-T analysis parsing failed for '{}'", chart.relative_path
-                )
+                logger.warning("Skew-T analysis parsing failed for '{}'", chart.relative_path)
 
             return analysis
 

@@ -59,9 +59,7 @@ async def download_image(
                     )
 
                 file_path.write_bytes(content)
-                logger.debug(
-                    "Downloaded: {} ({} bytes)", product.filename, len(content)
-                )
+                logger.debug("Downloaded: {} ({} bytes)", product.filename, len(content))
                 return DownloadResult(
                     product=product,
                     status=DownloadStatus.SUCCESS,
@@ -124,9 +122,7 @@ async def download_batch(
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         tasks = [
-            download_image(
-                client, product, target_dir, semaphore, max_retries, retry_delay
-            )
+            download_image(client, product, target_dir, semaphore, max_retries, retry_delay)
             for product in products
         ]
         return await asyncio.gather(*tasks)
@@ -143,6 +139,4 @@ def _is_image_content(data: bytes) -> bool:
     if data[:4] == b"\x89PNG":
         return True
     # JPEG
-    if data[:2] == b"\xff\xd8":
-        return True
-    return False
+    return data[:2] == b"\xff\xd8"

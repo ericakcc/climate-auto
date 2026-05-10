@@ -43,18 +43,8 @@ class CwaUpperAirScraper(BaseScraper):
     """
 
     source = SourceName.CWA_UPPER
-
-    def __init__(
-        self,
-        max_concurrent: int = 3,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.base_url = "https://npd1.cwa.gov.tw"
-        self.image_base = "/NPD/irisme_data"
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
+    base_url = "https://npd1.cwa.gov.tw"
+    image_base = "/NPD/irisme_data"
 
     def _get_init_times(self) -> list[str]:
         """Get candidate init times (YYMMDDHH) for today's 00Z and 12Z.

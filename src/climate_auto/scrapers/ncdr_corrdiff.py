@@ -6,7 +6,6 @@ from pathlib import Path
 import httpx
 from loguru import logger
 
-from climate_auto.config import NcdrCorrdiffConfig
 from climate_auto.downloader import download_batch
 from climate_auto.models import DownloadResult, ProductInfo, SourceName
 from climate_auto.scrapers.base import BaseScraper
@@ -16,18 +15,6 @@ class NcdrCorrdiffScraper(BaseScraper):
     """Scraper for NCDR CorrDiff AI downscaling products."""
 
     source = SourceName.NCDR_CORRDIFF
-
-    def __init__(
-        self,
-        config: NcdrCorrdiffConfig,
-        max_concurrent: int = 3,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.config = config
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
 
     async def _fetch_init_times(self) -> dict[str, str]:
         """Fetch latest init times for all CorrDiff models.
@@ -64,10 +51,7 @@ class NcdrCorrdiffScraper(BaseScraper):
             Full URL to the image.
         """
         filename = f"corrdiff_{model_code}_{param}_{init_time}_{hour:03d}h.jpg"
-        return (
-            f"{self.config.base_url}{self.config.image_base}"
-            f"/{directory}/{init_time}/{filename}"
-        )
+        return f"{self.config.base_url}{self.config.image_base}/{directory}/{init_time}/{filename}"
 
     async def discover_products(self, target_date: date) -> list[ProductInfo]:
         """Discover CorrDiff products.

@@ -6,7 +6,6 @@ from pathlib import Path
 import httpx
 from loguru import logger
 
-from climate_auto.config import CwaMarineConfig
 from climate_auto.downloader import download_batch
 from climate_auto.models import DownloadResult, ProductInfo, SourceName
 from climate_auto.scrapers.base import BaseScraper
@@ -28,18 +27,6 @@ class CwaMarineScraper(BaseScraper):
     """
 
     source = SourceName.CWA_MARINE
-
-    def __init__(
-        self,
-        config: CwaMarineConfig,
-        max_concurrent: int = 3,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.config = config
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
 
     async def _fetch_product_info(
         self, client: httpx.AsyncClient, product_cfg: dict[str, str]
@@ -68,9 +55,7 @@ class CwaMarineScraper(BaseScraper):
             if isinstance(data, list) and data:
                 return [{"path": item} for item in data if isinstance(item, str)]
             if isinstance(data, dict) and "data" in data:
-                return [
-                    {"path": item} for item in data["data"] if isinstance(item, str)
-                ]
+                return [{"path": item} for item in data["data"] if isinstance(item, str)]
         except (httpx.RequestError, ValueError) as e:
             logger.error("Failed to fetch marine product info: {}", e)
         return []

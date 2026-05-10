@@ -13,16 +13,16 @@ class AnalyzerConfig(BaseModel):
 
     enabled: bool = False
     model: str = "claude-sonnet-4-6"
-    max_turns: int = 15
-    budget_limit_usd: float = 5.0
+    max_turns: int = Field(default=15, gt=0)
+    budget_limit_usd: float = Field(default=5.0, gt=0)
 
 
 class BrowserConfig(BaseModel):
     """Playwright browser configuration."""
 
     headless: bool = True
-    viewport_width: int = 1920
-    viewport_height: int = 1080
+    viewport_width: int = Field(default=1920, gt=0)
+    viewport_height: int = Field(default=1080, gt=0)
 
 
 class NcdrEcmwfConfig(BaseModel):
@@ -32,9 +32,7 @@ class NcdrEcmwfConfig(BaseModel):
     base_url: str = "https://watch.ncdr.nat.gov.tw"
     image_base: str = "/00_Wxmap/2F7_ECMWF_0.25deg"
     date_api: str = "/php/list_realtime_date_csv?v=CHART_ECMWF_FORECAST_0.25"
-    variables: list[str] = Field(
-        default=["500", "850", "850mf", "700", "200", "1000", "8530"]
-    )
+    variables: list[str] = Field(default=["500", "850", "850mf", "700", "200", "1000", "8530"])
     forecast_hours: list[int] = Field(default=[0, 24, 48])
     daily_rain_days: list[int] = Field(default=[1, 2, 3])
 
@@ -46,8 +44,8 @@ class NcdrDwpModelConfig(BaseModel):
     directory: str
     prefix: str
     date_api_key: str
-    forecast_step: int = 12
-    max_steps: int = 24
+    forecast_step: int = Field(default=12, gt=0)
+    max_steps: int = Field(default=24, ge=1, le=500)
 
 
 class NcdrDwpConfig(BaseModel):
@@ -140,6 +138,18 @@ class CwaMarineConfig(BaseModel):
     )
 
 
+class CwaUpperConfig(BaseModel):
+    """CWA NPD upper-air scraper configuration."""
+
+    enabled: bool = False
+
+
+class BomMjoConfig(BaseModel):
+    """Australian BOM MJO scraper configuration."""
+
+    enabled: bool = False
+
+
 class SourcesConfig(BaseModel):
     """All data source configurations."""
 
@@ -148,6 +158,8 @@ class SourcesConfig(BaseModel):
     ncdr_corrdiff: NcdrCorrdiffConfig = Field(default_factory=NcdrCorrdiffConfig)
     cwa_main: CwaMainConfig = Field(default_factory=CwaMainConfig)
     cwa_marine: CwaMarineConfig = Field(default_factory=CwaMarineConfig)
+    cwa_upper: CwaUpperConfig = Field(default_factory=CwaUpperConfig)
+    bom_mjo: BomMjoConfig = Field(default_factory=BomMjoConfig)
 
 
 class Settings(BaseSettings):
@@ -155,10 +167,10 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path("./data")
     timezone: str = "Asia/Taipei"
-    max_retries: int = 3
-    retry_delay_seconds: float = 2.0
-    request_timeout_seconds: float = 30.0
-    max_concurrent_downloads: int = 3
+    max_retries: int = Field(default=3, ge=0)
+    retry_delay_seconds: float = Field(default=2.0, ge=0)
+    request_timeout_seconds: float = Field(default=30.0, gt=0)
+    max_concurrent_downloads: int = Field(default=3, gt=0)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
     analyzer: AnalyzerConfig = Field(default_factory=AnalyzerConfig)

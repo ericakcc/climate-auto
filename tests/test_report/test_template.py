@@ -43,9 +43,7 @@ class TestTemplateRendering:
                 ReportSection(
                     id="1_review",
                     title="當日回顧",
-                    subsections=[
-                        ReportSubsection(id="analysis", title="分析場", charts=[chart])
-                    ],
+                    subsections=[ReportSubsection(id="analysis", title="分析場", charts=[chart])],
                 )
             ],
             summary=ManifestSummary(total_downloaded=10, total_in_report=1),

@@ -3,13 +3,13 @@
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-import httpx
 from loguru import logger
 
-from climate_auto.config import NcdrDwpConfig, NcdrDwpModelConfig
+from climate_auto.config import NcdrDwpModelConfig
 from climate_auto.downloader import download_batch
 from climate_auto.models import DownloadResult, ProductInfo, SourceName
 from climate_auto.scrapers.base import BaseScraper
+from climate_auto.scrapers.utils import fetch_init_time_csv
 
 _TW_TZ = timezone(timedelta(hours=8))
 
@@ -18,18 +18,6 @@ class NcdrDwpScraper(BaseScraper):
     """Scraper for NCDR DWP (Deep Weather Prediction) AI model charts."""
 
     source = SourceName.NCDR_DWP
-
-    def __init__(
-        self,
-        config: NcdrDwpConfig,
-        max_concurrent: int = 3,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.config = config
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
 
     async def _fetch_init_time(self, date_api_key: str) -> str | None:
         """Fetch the latest init time for a given model.
@@ -41,16 +29,7 @@ class NcdrDwpScraper(BaseScraper):
             Init time string (YYYYMMDDHH) or None.
         """
         url = f"{self.config.base_url}/php/list_realtime_date_csv?v={date_api_key}"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                parts = resp.text.strip().split(",")
-                if len(parts) >= 2:
-                    return parts[1].strip()[:10]
-            except httpx.RequestError as e:
-                logger.error("Failed to fetch DWP date for {}: {}", date_api_key, e)
-        return None
+        return await fetch_init_time_csv(url, timeout=self.timeout)
 
     def _build_url(
         self,

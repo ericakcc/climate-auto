@@ -98,7 +98,7 @@ def build_report_folder(base_dir: Path, target_date: date) -> Path:
     copied = 0
     skipped = 0
 
-    for target_subfolder, source_name, pattern, description in REPORT_FILE_MAPPING:
+    for target_subfolder, source_name, pattern, _description in REPORT_FILE_MAPPING:
         source_dir = date_dir / source_name
         if not source_dir.exists():
             logger.debug("Source dir not found: {}", source_dir)

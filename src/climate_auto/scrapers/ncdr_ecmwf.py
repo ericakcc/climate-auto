@@ -3,13 +3,12 @@
 from datetime import date
 from pathlib import Path
 
-import httpx
 from loguru import logger
 
-from climate_auto.config import NcdrEcmwfConfig
 from climate_auto.downloader import download_batch
 from climate_auto.models import DownloadResult, ProductInfo, SourceName
 from climate_auto.scrapers.base import BaseScraper
+from climate_auto.scrapers.utils import fetch_init_time_csv
 
 
 class NcdrEcmwfScraper(BaseScraper):
@@ -21,18 +20,6 @@ class NcdrEcmwfScraper(BaseScraper):
 
     source = SourceName.NCDR_ECMWF
 
-    def __init__(
-        self,
-        config: NcdrEcmwfConfig,
-        max_concurrent: int = 3,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.config = config
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
-
     async def _fetch_latest_init_time(self) -> str | None:
         """Fetch the latest available initialization time from the date API.
 
@@ -40,25 +27,12 @@ class NcdrEcmwfScraper(BaseScraper):
             Init time string (YYYYMMDDHH) or None if unavailable.
         """
         url = self.config.base_url + self.config.date_api
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                # Format: "CHART_ECMWF_FORECAST_0.25_date,202603181200"
-                text = resp.text.strip()
-                parts = text.split(",")
-                if len(parts) >= 2:
-                    # Take first 10 chars (YYYYMMDDHH)
-                    init_time = parts[1].strip()[:10]
-                    logger.info("Latest ECMWF init time: {}", init_time)
-                    return init_time
-            except httpx.RequestError as e:
-                logger.error("Failed to fetch ECMWF date list: {}", e)
-        return None
+        init_time = await fetch_init_time_csv(url, timeout=self.timeout)
+        if init_time:
+            logger.info("Latest ECMWF init time: {}", init_time)
+        return init_time
 
-    def _build_chart_url(
-        self, init_time: str, variable: str, forecast_hour: int
-    ) -> str:
+    def _build_chart_url(self, init_time: str, variable: str, forecast_hour: int) -> str:
         """Build URL for an ECMWF chart image.
 
         Args:

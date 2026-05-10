@@ -28,15 +28,11 @@ def test_build_batch_prompt_contains_all_paths() -> None:
 
     charts = [
         (
-            ChartImage(
-                relative_path="1_review/analysis/500hPa.png", description="500hPa 分析"
-            ),
+            ChartImage(relative_path="1_review/analysis/500hPa.png", description="500hPa 分析"),
             Path("/data/report/1_review/analysis/500hPa.png"),
         ),
         (
-            ChartImage(
-                relative_path="1_review/analysis/850hPa.png", description="850hPa 分析"
-            ),
+            ChartImage(relative_path="1_review/analysis/850hPa.png", description="850hPa 分析"),
             Path("/data/report/1_review/analysis/850hPa.png"),
         ),
     ]
@@ -161,9 +157,7 @@ async def test_analyze_batch_maps_results() -> None:
     ]
 
     mock_message = MagicMock()
-    mock_message.result = (
-        '{"1_review/500.png": "高壓偏東", "1_review/850.png": "西南風明顯"}'
-    )
+    mock_message.result = '{"1_review/500.png": "高壓偏東", "1_review/850.png": "西南風明顯"}'
 
     async def mock_query(**kwargs):
         yield mock_message
@@ -209,7 +203,7 @@ async def test_agent_error_returns_empty_dict() -> None:
 
     async def mock_query(**kwargs):
         raise RuntimeError("API error")
-        yield  # noqa: F401 - make it an async generator
+        yield
 
     mock_sdk = _make_mock_sdk(mock_query)
     with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
@@ -362,9 +356,7 @@ async def test_analyze_batch_separates_skewt() -> None:
             msg.result = '{"text_box": {"T0": 18.2}, "layers": []}'
         else:
             # Third call: skewt analysis
-            msg.result = (
-                '{"1_review/sounding/skewt_Taipei.gif": "低層近飽和"}'
-            )
+            msg.result = '{"1_review/sounding/skewt_Taipei.gif": "低層近飽和"}'
         yield msg
 
     mock_sdk = _make_mock_sdk(mock_query)

@@ -3,8 +3,6 @@
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-
-from climate_auto.config import CwaMainConfig
 from climate_auto.downloader import download_batch
 from climate_auto.models import DownloadResult, ProductInfo, SourceName
 from climate_auto.scrapers.base import BaseScraper
@@ -20,18 +18,6 @@ class CwaMainScraper(BaseScraper):
     """
 
     source = SourceName.CWA_MAIN
-
-    def __init__(
-        self,
-        config: CwaMainConfig,
-        max_concurrent: int = 3,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.config = config
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
 
     async def discover_products(self, target_date: date) -> list[ProductInfo]:
         """Discover CWA weather image products.

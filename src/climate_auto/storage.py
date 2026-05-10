@@ -38,9 +38,7 @@ def ensure_source_dir(base_dir: Path, target_date: date, source: SourceName) -> 
     return source_dir
 
 
-def save_manifest(
-    base_dir: Path, target_date: date, manifest: CollectionManifest
-) -> Path:
+def save_manifest(base_dir: Path, target_date: date, manifest: CollectionManifest) -> Path:
     """Save the collection manifest to disk.
 
     Args:

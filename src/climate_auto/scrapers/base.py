@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -19,6 +20,27 @@ class BaseScraper(ABC):
     """Abstract base class for all weather data scrapers."""
 
     source: SourceName
+
+    def __init__(
+        self,
+        config: Any = None,
+        max_concurrent: int = 3,
+        max_retries: int = 3,
+        timeout: float = 30.0,
+    ) -> None:
+        """Store common scraper settings.
+
+        Args:
+            config: Source-specific Pydantic config object, or None for
+                config-less scrapers (e.g., bom_mjo, cwa_upper).
+            max_concurrent: Maximum concurrent downloads.
+            max_retries: Maximum download retries.
+            timeout: HTTP request timeout in seconds.
+        """
+        self.config = config
+        self.max_concurrent = max_concurrent
+        self.max_retries = max_retries
+        self.timeout = timeout
 
     @abstractmethod
     async def discover_products(self, target_date: date) -> list[ProductInfo]:

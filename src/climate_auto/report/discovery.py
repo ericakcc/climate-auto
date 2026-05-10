@@ -129,18 +129,11 @@ def build_report_context(
             charts = sections_map[sec_id][sub_key]
             if not charts:
                 continue
-            if sub_key == "_root":
-                sub_title = sec_title
-            else:
-                sub_title = sub_titles.get(sub_key, sub_key)
-            subsections.append(
-                ReportSubsection(id=sub_key, title=sub_title, charts=charts)
-            )
+            sub_title = sec_title if sub_key == "_root" else sub_titles.get(sub_key, sub_key)
+            subsections.append(ReportSubsection(id=sub_key, title=sub_title, charts=charts))
 
         if subsections:
-            sections.append(
-                ReportSection(id=sec_id, title=sec_title, subsections=subsections)
-            )
+            sections.append(ReportSection(id=sec_id, title=sec_title, subsections=subsections))
 
     # Manifest summary
     total_downloaded = 0

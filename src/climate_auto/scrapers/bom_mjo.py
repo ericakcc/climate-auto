@@ -27,16 +27,6 @@ class BomMjoScraper(BaseScraper):
 
     source = SourceName.BOM_MJO
 
-    def __init__(
-        self,
-        max_concurrent: int = 2,
-        max_retries: int = 3,
-        timeout: float = 30.0,
-    ) -> None:
-        self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
-        self.timeout = timeout
-
     async def discover_products(self, target_date: date) -> list[ProductInfo]:
         """Discover MJO products (static list).
 
