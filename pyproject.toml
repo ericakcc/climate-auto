@@ -25,6 +25,14 @@ climate-auto = "climate_auto.main:main"
 llm = [
     "claude-agent-sdk>=0.1.0",
 ]
+numerical = [
+    "cfgrib>=0.9.15.1",
+    "eccodes<2.41",
+    "ecmwf-opendata>=0.3.29",
+    "ecmwflibs>=0.7.0",
+    "metpy>=1.7.1",
+    "siphon>=0.10.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]

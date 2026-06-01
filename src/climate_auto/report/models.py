@@ -44,3 +44,4 @@ class ReportContext(BaseModel):
     generated_at: datetime = Field(default_factory=datetime.now)
     sections: list[ReportSection] = Field(default_factory=list)
     summary: ManifestSummary = Field(default_factory=ManifestSummary)
+    synthesis: str = ""

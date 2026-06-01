@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AnalyzerConfig(BaseModel):
@@ -15,6 +15,28 @@ class AnalyzerConfig(BaseModel):
     model: str = "claude-sonnet-4-6"
     max_turns: int = 15
     budget_limit_usd: float = 5.0
+    concurrency: int = 5
+
+
+class NumericalConfig(BaseModel):
+    """Numeric (route-2) data pipeline configuration.
+
+    When enabled, ECMWF open-data forecast fields are computed numerically and
+    merged into the report's extractions, instead of (or in addition to) reading
+    the corresponding GIFs with the vision model.
+    """
+
+    enabled: bool = False
+    run_time: int = 0  # ECMWF run hour (0/6/12/18)
+    steps: list[int] = Field(default=[0, 24, 48])  # 0 = analysis, then forecasts
+    sounding_lat: float = 25.0  # Taipei
+    sounding_lon: float = 121.5
+    # CWA surface stations (matched against StationName) for observed obs (1-IV);
+    # empty disables the CWA surface block. Requires Settings.cwa_api_key.
+    surface_stations: list[str] = Field(default=["臺北", "板橋", "淡水"])
+    # relative_path substrings of image charts to SKIP in vision extraction
+    # because the numeric route replaces them (set after a dry run reveals paths).
+    replace_chart_patterns: list[str] = Field(default=[])
 
 
 class BrowserConfig(BaseModel):
@@ -151,7 +173,20 @@ class SourcesConfig(BaseModel):
 
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings.
+
+    Secrets are read from environment variables / a local ``.env`` file
+    (case-insensitive), while non-secret config comes from YAML.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    cwa_api_key: str | None = None
+    """CWA OpenData Authorization key, from CWA_API_KEY env var or .env."""
 
     data_dir: Path = Path("./data")
     timezone: str = "Asia/Taipei"
@@ -162,6 +197,7 @@ class Settings(BaseSettings):
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
     analyzer: AnalyzerConfig = Field(default_factory=AnalyzerConfig)
+    numerical: NumericalConfig = Field(default_factory=NumericalConfig)
 
 
 def load_settings(config_path: Path | None = None) -> Settings:

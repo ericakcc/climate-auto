@@ -9,6 +9,11 @@ wheels/
 # Virtual environments
 .venv
 
+# Secrets / API keys (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
 # Downloaded data
 data/
 

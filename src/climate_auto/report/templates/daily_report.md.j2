@@ -6,6 +6,14 @@
 
 ---
 
+{% if ctx.synthesis %}
+## 天氣診斷分析
+
+{{ ctx.synthesis }}
+
+---
+
+{% endif %}
 {% for section in ctx.sections %}
 ## {{ loop.index }}. {{ section.title }}
 

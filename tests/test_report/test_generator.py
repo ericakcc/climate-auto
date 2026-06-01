@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from climate_auto.report.analyzer import PlaceholderAnalyzer
-from climate_auto.report.generator import generate_report
+from climate_auto.report.generator import (
+    EXTRACTIONS_FILENAME,
+    generate_report,
+    load_extractions,
+    save_extractions,
+)
 
 
 def _setup_fake_data(tmp_path: Path, target_date: date) -> Path:
@@ -79,3 +84,137 @@ class TestGenerateReport:
 
         expected = base_dir / "2026-03-19" / "report" / "daily_report.md"
         assert result == expected
+
+
+class TestExtractionsPersistence:
+    """Tests for extractions.md save/load round-trip."""
+
+    def test_save_creates_md_file(self, tmp_path: Path) -> None:
+        extractions = {"500.png": "高壓脊偏東", "850.png": "西南風明顯"}
+        path = save_extractions(tmp_path, extractions)
+
+        assert path.exists()
+        assert path.name == EXTRACTIONS_FILENAME
+
+    def test_save_load_round_trip(self, tmp_path: Path) -> None:
+        original = {
+            "1_review/analysis/500.gif": "高壓脊偏東",
+            "1_review/sounding/skewt.gif": "低層近飽和",
+        }
+        save_extractions(tmp_path, original)
+        loaded = load_extractions(tmp_path)
+
+        assert loaded == original
+
+    def test_save_preserves_unicode(self, tmp_path: Path) -> None:
+        extractions = {"img.png": "台灣位於副熱帶高壓北側邊緣"}
+        save_extractions(tmp_path, extractions)
+
+        raw = (tmp_path / EXTRACTIONS_FILENAME).read_text(encoding="utf-8")
+        assert "台灣" in raw
+
+    def test_save_produces_readable_markdown(self, tmp_path: Path) -> None:
+        extractions = {"500.png": "高壓脊偏東\n副高西伸"}
+        save_extractions(tmp_path, extractions)
+
+        raw = (tmp_path / EXTRACTIONS_FILENAME).read_text(encoding="utf-8")
+        assert "## 500.png" in raw
+        assert "高壓脊偏東\n副高西伸" in raw
+
+    def test_load_missing_file_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError, match="--extract"):
+            load_extractions(tmp_path)
+
+    def test_load_after_manual_edit(self, tmp_path: Path) -> None:
+        """Simulate human editing extractions.md between steps."""
+        original = {"500.png": "LLM 原始輸出（有誤）"}
+        save_extractions(tmp_path, original)
+
+        # Human directly edits the markdown file
+        edited_md = "## 500.png\n\n人工修正後的分析\n"
+        (tmp_path / EXTRACTIONS_FILENAME).write_text(edited_md, encoding="utf-8")
+
+        loaded = load_extractions(tmp_path)
+        assert loaded == {"500.png": "人工修正後的分析"}
+
+    def test_multiline_extraction_round_trip(self, tmp_path: Path) -> None:
+        """Multi-line extraction text survives save/load."""
+        original = {
+            "500.png": "第一段分析\n\n第二段分析\n有多行內容",
+        }
+        save_extractions(tmp_path, original)
+        loaded = load_extractions(tmp_path)
+
+        assert loaded == original
+
+
+@pytest.mark.asyncio
+class TestExtractOnlyMode:
+    """Tests for extract_only mode in generate_report."""
+
+    async def test_extract_only_saves_extractions_json(
+        self, tmp_path: Path
+    ) -> None:
+        target = date(2026, 3, 19)
+        base_dir = _setup_fake_data(tmp_path, target)
+        analyzer = PlaceholderAnalyzer()
+
+        await generate_report(
+            base_dir, target, analyzer=analyzer, extract_only=True
+        )
+
+        # PlaceholderAnalyzer returns empty strings, so no extractions saved
+        # but the report should still be generated
+        assert (base_dir / "2026-03-19" / "report" / "daily_report.md").exists()
+
+    async def test_extract_only_no_synthesis(self, tmp_path: Path) -> None:
+        target = date(2026, 3, 19)
+        base_dir = _setup_fake_data(tmp_path, target)
+        analyzer = PlaceholderAnalyzer()
+
+        result = await generate_report(
+            base_dir, target, analyzer=analyzer, extract_only=True
+        )
+        content = result.read_text(encoding="utf-8")
+
+        # No synthesis section should be present
+        assert "天氣診斷分析" not in content
+
+
+@pytest.mark.asyncio
+class TestSynthesizeOnlyMode:
+    """Tests for synthesize_only mode in generate_report."""
+
+    async def test_synthesize_only_loads_extractions(
+        self, tmp_path: Path
+    ) -> None:
+        target = date(2026, 3, 19)
+        base_dir = _setup_fake_data(tmp_path, target)
+        report_dir = base_dir / "2026-03-19" / "report"
+
+        # Pre-create extractions.json (simulating prior --extract run)
+        extractions = {
+            "1_review/analysis/ECMWF500_20260319_f000.gif": "人工修正的分析",
+        }
+        save_extractions(report_dir, extractions)
+
+        analyzer = PlaceholderAnalyzer()
+        result = await generate_report(
+            base_dir, target, analyzer=analyzer, synthesize_only=True
+        )
+        content = result.read_text(encoding="utf-8")
+
+        # Per-chart extraction should appear in the report
+        assert "人工修正的分析" in content
+
+    async def test_synthesize_only_missing_file_raises(
+        self, tmp_path: Path
+    ) -> None:
+        target = date(2026, 3, 19)
+        base_dir = _setup_fake_data(tmp_path, target)
+        analyzer = PlaceholderAnalyzer()
+
+        with pytest.raises(FileNotFoundError, match="--extract"):
+            await generate_report(
+                base_dir, target, analyzer=analyzer, synthesize_only=True
+            )

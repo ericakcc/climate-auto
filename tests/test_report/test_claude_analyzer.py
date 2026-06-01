@@ -22,173 +22,72 @@ def _make_mock_sdk(mock_query_fn: object = None) -> MagicMock:
 # --- Prompt building ---
 
 
-def test_build_batch_prompt_contains_all_paths() -> None:
-    """Prompt includes every chart's relative_path and description."""
-    from climate_auto.report.claude_analyzer import _build_batch_prompt
+def test_build_extraction_prompt_contains_path() -> None:
+    """Extraction prompt includes chart path and description."""
+    from climate_auto.report.claude_analyzer import _build_extraction_prompt
 
-    charts = [
-        (
-            ChartImage(
-                relative_path="1_review/analysis/500hPa.png", description="500hPa 分析"
-            ),
-            Path("/data/report/1_review/analysis/500hPa.png"),
-        ),
-        (
-            ChartImage(
-                relative_path="1_review/analysis/850hPa.png", description="850hPa 分析"
-            ),
-            Path("/data/report/1_review/analysis/850hPa.png"),
-        ),
-    ]
-
-    prompt = _build_batch_prompt(charts, section_context="實況回顧")
-
-    assert "實況回顧" in prompt
-    assert "1_review/analysis/500hPa.png" in prompt
-    assert "1_review/analysis/850hPa.png" in prompt
-    assert "500hPa 分析" in prompt
-    assert "850hPa 分析" in prompt
-    assert "/data/report/1_review/analysis/500hPa.png" in prompt
-
-
-def test_build_batch_prompt_no_section_context() -> None:
-    """Prompt works without section context."""
-    from climate_auto.report.claude_analyzer import _build_batch_prompt
-
-    charts = [
-        (
-            ChartImage(relative_path="img.png", description="test"),
-            Path("/data/img.png"),
-        ),
-    ]
-
-    prompt = _build_batch_prompt(charts, section_context="")
-
-    assert "圖片分析" in prompt
-    assert "img.png" in prompt
-
-
-# --- Response parsing ---
-
-
-def test_parse_valid_json() -> None:
-    """Correctly parses a valid JSON response."""
-    from climate_auto.report.claude_analyzer import _parse_response
-
-    text = '{"a/b.png": "高壓脊偏東", "c/d.png": "水氣充沛"}'
-    result = _parse_response(text, ["a/b.png", "c/d.png"])
-
-    assert result == {"a/b.png": "高壓脊偏東", "c/d.png": "水氣充沛"}
-
-
-def test_parse_json_with_surrounding_text() -> None:
-    """Extracts JSON even with surrounding text."""
-    from climate_auto.report.claude_analyzer import _parse_response
-
-    text = 'Here is my analysis:\n{"a.png": "分析結果"}\nDone!'
-    result = _parse_response(text, ["a.png"])
-
-    assert result == {"a.png": "分析結果"}
-
-
-def test_parse_invalid_json_returns_empty() -> None:
-    """Returns empty dict for invalid JSON."""
-    from climate_auto.report.claude_analyzer import _parse_response
-
-    result = _parse_response("not json at all", ["a.png"])
-    assert result == {}
-
-
-def test_parse_filters_unexpected_keys() -> None:
-    """Only returns results for expected keys."""
-    from climate_auto.report.claude_analyzer import _parse_response
-
-    text = '{"a.png": "ok", "unexpected.png": "extra"}'
-    result = _parse_response(text, ["a.png"])
-
-    assert result == {"a.png": "ok"}
-
-
-def test_parse_skips_non_string_values() -> None:
-    """Skips entries where value is not a string."""
-    from climate_auto.report.claude_analyzer import _parse_response
-
-    text = '{"a.png": "ok", "b.png": 123}'
-    result = _parse_response(text, ["a.png", "b.png"])
-
-    assert result == {"a.png": "ok"}
-
-
-def test_parse_no_braces_returns_empty() -> None:
-    """Returns empty dict when no JSON braces found."""
-    from climate_auto.report.claude_analyzer import _parse_response
-
-    result = _parse_response("just text without braces", ["a.png"])
-    assert result == {}
-
-
-# --- Agent call (mocked) ---
-
-
-def test_system_prompt_850hpa_mentions_frontal_features() -> None:
-    """SYSTEM_PROMPT guides 850hPa analysis toward frontal features."""
-    from climate_auto.report.claude_analyzer import SYSTEM_PROMPT
-
-    assert "水氣通量" in SYSTEM_PROMPT
-    assert "鋒面" in SYSTEM_PROMPT
-
-
-def test_system_prompt_excludes_skewt() -> None:
-    """SYSTEM_PROMPT notes Skew-T is handled separately."""
-    from climate_auto.report.claude_analyzer import SYSTEM_PROMPT
-
-    assert "探空圖" in SYSTEM_PROMPT
-    assert "另行處理" in SYSTEM_PROMPT
-
-
-@pytest.mark.asyncio
-async def test_analyze_batch_maps_results() -> None:
-    """Batch analysis correctly maps agent response to charts."""
-    charts = [
-        (
-            ChartImage(relative_path="1_review/500.png", description="500hPa"),
-            Path("/data/1_review/500.png"),
-        ),
-        (
-            ChartImage(relative_path="1_review/850.png", description="850hPa"),
-            Path("/data/1_review/850.png"),
-        ),
-    ]
-
-    mock_message = MagicMock()
-    mock_message.result = (
-        '{"1_review/500.png": "高壓偏東", "1_review/850.png": "西南風明顯"}'
+    chart = ChartImage(
+        relative_path="1_review/analysis/500hPa.png",
+        description="500hPa 分析",
     )
+    prompt = _build_extraction_prompt(chart, Path("/data/report/500hPa.png"))
 
-    async def mock_query(**kwargs):
-        yield mock_message
+    assert "/data/report/500hPa.png" in prompt
+    assert "500hPa 分析" in prompt
 
-    mock_sdk = _make_mock_sdk(mock_query)
-    with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
-        from climate_auto.report.claude_analyzer import ClaudeAnalyzer
 
-        analyzer = ClaudeAnalyzer(AnalyzerConfig())
-        results = await analyzer.analyze_batch(charts, "實況回顧")
+def test_build_synthesis_prompt_contains_all_extractions() -> None:
+    """Synthesis prompt includes all chart extraction results."""
+    from climate_auto.report.claude_analyzer import _build_synthesis_prompt
 
-    assert results == {
-        "1_review/500.png": "高壓偏東",
+    extractions = {
+        "1_review/500.png": "高壓脊偏東",
         "1_review/850.png": "西南風明顯",
+        "2_f24h/500.png": "槽線東移",
     }
+    prompt = _build_synthesis_prompt(extractions)
+
+    assert "高壓脊偏東" in prompt
+    assert "西南風明顯" in prompt
+    assert "槽線東移" in prompt
+    assert "1_review/500.png" in prompt
+    assert "2_f24h/500.png" in prompt
+
+
+# --- System prompts ---
+
+
+def test_extraction_system_prompt_covers_chart_types() -> None:
+    """Extraction system prompt includes guidance for different chart types."""
+    from climate_auto.report.claude_analyzer import EXTRACTION_SYSTEM_PROMPT
+
+    assert "500hPa" in EXTRACTION_SYSTEM_PROMPT
+    assert "850hPa" in EXTRACTION_SYSTEM_PROMPT
+    assert "水氣通量" in EXTRACTION_SYSTEM_PROMPT
+    assert "鋒面" in EXTRACTION_SYSTEM_PROMPT
+
+
+def test_synthesis_system_prompt_covers_analysis_structure() -> None:
+    """Synthesis system prompt includes the analysis architecture."""
+    from climate_auto.report.claude_analyzer import SYNTHESIS_SYSTEM_PROMPT
+
+    assert "綜觀環境概述" in SYNTHESIS_SYSTEM_PROMPT
+    assert "天氣回顧" in SYNTHESIS_SYSTEM_PROMPT
+    assert "天氣展望" in SYNTHESIS_SYSTEM_PROMPT
+    assert "關鍵提醒" in SYNTHESIS_SYSTEM_PROMPT
+
+
+# --- Agent calls (mocked) ---
 
 
 @pytest.mark.asyncio
-async def test_analyze_single_delegates_to_batch() -> None:
-    """Single analyze() internally calls analyze_batch()."""
-    chart = ChartImage(relative_path="img.png", description="test")
-    image_path = Path("/data/img.png")
+async def test_extract_info_returns_text() -> None:
+    """extract_info returns extracted information text."""
+    chart = ChartImage(relative_path="500.png", description="500hPa")
+    image_path = Path("/data/500.png")
 
     mock_message = MagicMock()
-    mock_message.result = '{"img.png": "分析結果"}'
+    mock_message.result = "高壓脊位於 130E 附近"
 
     async def mock_query(**kwargs):
         yield mock_message
@@ -198,14 +97,81 @@ async def test_analyze_single_delegates_to_batch() -> None:
         from climate_auto.report.claude_analyzer import ClaudeAnalyzer
 
         analyzer = ClaudeAnalyzer(AnalyzerConfig())
-        result = await analyzer.analyze(chart, image_path)
+        result = await analyzer.extract_info(chart, image_path)
 
-    assert result == "分析結果"
+    assert result == "高壓脊位於 130E 附近"
 
 
 @pytest.mark.asyncio
-async def test_agent_error_returns_empty_dict() -> None:
-    """Agent exception returns empty dict (graceful degradation)."""
+async def test_extract_all_parallel() -> None:
+    """extract_all processes multiple charts and returns all results."""
+    charts = [
+        (
+            ChartImage(relative_path="500.png", description="500hPa"),
+            Path("/data/500.png"),
+        ),
+        (
+            ChartImage(relative_path="850.png", description="850hPa"),
+            Path("/data/850.png"),
+        ),
+    ]
+
+    async def mock_query(**kwargs):
+        msg = MagicMock()
+        prompt = kwargs.get("prompt", "")
+        if "500hPa" in prompt:
+            msg.result = "高壓脊偏東"
+        else:
+            msg.result = "西南風明顯"
+        yield msg
+
+    mock_sdk = _make_mock_sdk(mock_query)
+    with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
+        from climate_auto.report.claude_analyzer import ClaudeAnalyzer
+
+        analyzer = ClaudeAnalyzer(AnalyzerConfig())
+        results = await analyzer.extract_all(charts)
+
+    assert results == {"500.png": "高壓脊偏東", "850.png": "西南風明顯"}
+
+
+@pytest.mark.asyncio
+async def test_synthesize_produces_diagnosis() -> None:
+    """synthesize returns unified weather diagnosis."""
+    extractions = {
+        "500.png": "高壓脊偏東",
+        "850.png": "西南風明顯",
+    }
+    charts = [
+        (
+            ChartImage(relative_path="500.png", description="500hPa"),
+            Path("/data/500.png"),
+        ),
+        (
+            ChartImage(relative_path="850.png", description="850hPa"),
+            Path("/data/850.png"),
+        ),
+    ]
+
+    mock_message = MagicMock()
+    mock_message.result = "綜合分析：高壓脊偏東搭配西南風，台灣處於暖區。"
+
+    async def mock_query(**kwargs):
+        yield mock_message
+
+    mock_sdk = _make_mock_sdk(mock_query)
+    with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
+        from climate_auto.report.claude_analyzer import ClaudeAnalyzer
+
+        analyzer = ClaudeAnalyzer(AnalyzerConfig())
+        result = await analyzer.synthesize(extractions, charts)
+
+    assert "高壓脊偏東" in result
+
+
+@pytest.mark.asyncio
+async def test_extract_info_error_returns_empty() -> None:
+    """Agent exception returns empty string (graceful degradation)."""
 
     async def mock_query(**kwargs):
         raise RuntimeError("API error")
@@ -216,19 +182,14 @@ async def test_agent_error_returns_empty_dict() -> None:
         from climate_auto.report.claude_analyzer import ClaudeAnalyzer
 
         analyzer = ClaudeAnalyzer(AnalyzerConfig())
-        charts = [
-            (
-                ChartImage(relative_path="img.png", description="test"),
-                Path("/data/img.png"),
-            ),
-        ]
-        results = await analyzer.analyze_batch(charts, "section")
+        chart = ChartImage(relative_path="img.png", description="test")
+        result = await analyzer.extract_info(chart, Path("/data/img.png"))
 
-    assert results == {}
+    assert result == ""
 
 
 @pytest.mark.asyncio
-async def test_analyze_batch_empty_charts() -> None:
+async def test_extract_all_empty_charts() -> None:
     """Empty chart list returns empty dict without calling agent."""
     mock_sdk = _make_mock_sdk()
     with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
@@ -236,11 +197,24 @@ async def test_analyze_batch_empty_charts() -> None:
 
         analyzer = ClaudeAnalyzer(AnalyzerConfig())
 
-    results = await analyzer.analyze_batch([], "section")
+    results = await analyzer.extract_all([])
     assert results == {}
 
 
-# --- Skew-T two-pass detection ---
+@pytest.mark.asyncio
+async def test_synthesize_empty_extractions() -> None:
+    """Empty extractions returns empty string without calling agent."""
+    mock_sdk = _make_mock_sdk()
+    with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
+        from climate_auto.report.claude_analyzer import ClaudeAnalyzer
+
+        analyzer = ClaudeAnalyzer(AnalyzerConfig())
+
+    result = await analyzer.synthesize({}, [])
+    assert result == ""
+
+
+# --- Skew-T detection ---
 
 
 def test_is_skewt_detects_skewt_by_path() -> None:
@@ -276,7 +250,7 @@ def test_is_skewt_rejects_non_skewt() -> None:
     assert _is_skewt(chart) is False
 
 
-# --- Skew-T extraction prompt ---
+# --- Skew-T prompts ---
 
 
 def test_skewt_extraction_prompt_contains_cwa_format_guidance() -> None:
@@ -301,23 +275,6 @@ def test_build_skewt_extraction_prompt_contains_path() -> None:
     assert "skewt_Taipei_26031900.gif" in prompt
 
 
-# --- Skew-T analysis prompt ---
-
-
-def test_skewt_analysis_prompt_loads_guide_content() -> None:
-    """Analysis prompt dynamically loads guide and includes key rules."""
-    from climate_auto.report.claude_analyzer import _load_skewt_analysis_prompt
-
-    prompt = _load_skewt_analysis_prompt()
-    # Content from skew-t-guide.md should be embedded
-    assert "K-Index" in prompt
-    assert "Lifted Index" in prompt
-    assert "Total Totals" in prompt
-    # Template task instructions should be present
-    assert "逆溫" in prompt or "inversion" in prompt.lower()
-    assert "600hPa" in prompt
-
-
 def test_build_skewt_analysis_prompt_embeds_extracted_data() -> None:
     """Analysis prompt embeds the extracted JSON data."""
     from climate_auto.report.claude_analyzer import _build_skewt_analysis_prompt
@@ -332,21 +289,12 @@ def test_build_skewt_analysis_prompt_embeds_extracted_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analyze_batch_separates_skewt() -> None:
-    """Batch analysis routes Skew-T charts to two-pass flow."""
-    charts = [
-        (
-            ChartImage(relative_path="1_review/500.png", description="500hPa"),
-            Path("/data/1_review/500.png"),
-        ),
-        (
-            ChartImage(
-                relative_path="1_review/sounding/skewt_Taipei.gif",
-                description="Taipei sounding (Skew-T)",
-            ),
-            Path("/data/1_review/sounding/skewt_Taipei.gif"),
-        ),
-    ]
+async def test_extract_info_routes_skewt_to_two_pass() -> None:
+    """Skew-T chart triggers two-pass extraction flow."""
+    chart = ChartImage(
+        relative_path="1_review/sounding/skewt_Taipei.gif",
+        description="Taipei sounding (Skew-T)",
+    )
 
     call_count = 0
 
@@ -355,16 +303,11 @@ async def test_analyze_batch_separates_skewt() -> None:
         call_count += 1
         msg = MagicMock()
         if call_count == 1:
-            # First call: regular batch for non-skewt
-            msg.result = '{"1_review/500.png": "高壓偏東"}'
-        elif call_count == 2:
-            # Second call: skewt extraction
+            # Pass 1: data extraction
             msg.result = '{"text_box": {"T0": 18.2}, "layers": []}'
         else:
-            # Third call: skewt analysis
-            msg.result = (
-                '{"1_review/sounding/skewt_Taipei.gif": "低層近飽和"}'
-            )
+            # Pass 2: analysis
+            msg.result = "低層近飽和，LCL 高度偏低"
         yield msg
 
     mock_sdk = _make_mock_sdk(mock_query)
@@ -372,8 +315,9 @@ async def test_analyze_batch_separates_skewt() -> None:
         from climate_auto.report.claude_analyzer import ClaudeAnalyzer
 
         analyzer = ClaudeAnalyzer(AnalyzerConfig())
-        results = await analyzer.analyze_batch(charts, "當日回顧")
+        result = await analyzer.extract_info(
+            chart, Path("/data/skewt_Taipei.gif")
+        )
 
-    assert results["1_review/500.png"] == "高壓偏東"
-    assert results["1_review/sounding/skewt_Taipei.gif"] == "低層近飽和"
-    assert call_count == 3  # regular batch + extraction + analysis
+    assert "低層近飽和" in result
+    assert call_count == 2

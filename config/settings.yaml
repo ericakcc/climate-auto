@@ -55,3 +55,22 @@ analyzer:
   model: "claude-sonnet-4-6"
   max_turns: 15
   budget_limit_usd: 5.0
+
+# Numeric (route-2) pipeline: compute fields from ECMWF open-data instead of
+# reading GIFs with the vision model. Enable with `enabled: true` or `--numeric`.
+# Needs the optional deps: `uv sync --extra numerical`.
+numerical:
+  enabled: false
+  run_time: 0          # ECMWF run hour (0/6/12/18)
+  steps: [0, 24, 48]   # 0 = analysis (f000), then forecasts
+  sounding_lat: 25.0   # Taipei, for forecast soundings (report 2-II / 3-III)
+  sounding_lon: 121.5
+  # Image charts to SKIP in vision because the numeric route replaces them.
+  # Covered: 500 hPa height field, 850 hPa moisture flux, deterministic daily
+  # rain (ECMWF tp). Kept on vision (no clean free numeric / spatial task):
+  # ECMWF700, ensemble rain (dailyensrn), radar, satellite, observed Skew-T.
+  replace_chart_patterns:
+    - "ECMWF500"
+    - "ECMWF700"
+    - "ECMWF850mf"
+    - "dailyrn"

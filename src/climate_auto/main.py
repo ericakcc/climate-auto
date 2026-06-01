@@ -9,7 +9,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from climate_auto.config import Settings, load_settings
+from climate_auto.config import NumericalConfig, Settings, load_settings
 from climate_auto.models import CollectionManifest, SourceName
 from climate_auto.scrapers.base import BaseScraper
 from climate_auto.scrapers.bom_mjo import BomMjoScraper
@@ -111,6 +111,7 @@ async def run_collection(
     settings: Settings,
     sources: list[SourceName] | None = None,
     analyzer: "BaseAnalyzer | None" = None,
+    numerical: "NumericalConfig | None" = None,
 ) -> CollectionManifest:
     """Run data collection for the given date.
 
@@ -169,7 +170,11 @@ async def run_collection(
 
     # Generate Markdown report
     report_path = await generate_report(
-        settings.data_dir, target_date, analyzer=analyzer
+        settings.data_dir,
+        target_date,
+        analyzer=analyzer,
+        numerical=numerical,
+        cwa_api_key=settings.cwa_api_key,
     )
     logger.info("Report generated: {}", report_path)
 
@@ -204,11 +209,32 @@ def main() -> None:
         default=False,
         help="Skip data collection; generate report from existing data.",
     )
-    parser.add_argument(
+    analysis_group = parser.add_mutually_exclusive_group()
+    analysis_group.add_argument(
         "--analyze",
         action="store_true",
         default=False,
-        help="Enable LLM chart analysis using Claude Agent SDK.",
+        help="Run full LLM pipeline (extract + synthesize).",
+    )
+    analysis_group.add_argument(
+        "--extract",
+        action="store_true",
+        default=False,
+        help="Phase 1 only: extract chart info, save extractions.json. "
+        "Edit the file, then run --synthesize.",
+    )
+    analysis_group.add_argument(
+        "--synthesize",
+        action="store_true",
+        default=False,
+        help="Phase 2 only: load extractions.json, synthesize diagnosis, "
+        "render report.",
+    )
+    parser.add_argument(
+        "--numeric",
+        action="store_true",
+        help="Enable the numeric (ECMWF) route: compute height/moisture/forecast-"
+        "sounding fields and merge into extractions instead of reading those GIFs.",
     )
     args = parser.parse_args()
 
@@ -235,20 +261,49 @@ def main() -> None:
     )
 
     # Initialize analyzer if requested
+    needs_analyzer = (
+        args.analyze or args.extract or args.synthesize or settings.analyzer.enabled
+    )
     analyzer = None
-    if args.analyze or settings.analyzer.enabled:
+    if needs_analyzer:
         from climate_auto.report.claude_analyzer import ClaudeAnalyzer
 
         analyzer = ClaudeAnalyzer(settings.analyzer)
         logger.info("LLM analyzer enabled (model={})", settings.analyzer.model)
 
-    if args.report_only:
+    # Numeric route: enable via --numeric flag or settings.numerical.enabled.
+    numerical_cfg = settings.numerical
+    if args.numeric:
+        numerical_cfg = numerical_cfg.model_copy(update={"enabled": True})
+    if numerical_cfg.enabled:
+        logger.info("Numeric (ECMWF) route enabled (steps={})", numerical_cfg.steps)
+
+    # --extract and --synthesize imply --report-only
+    report_only = args.report_only or args.extract or args.synthesize
+
+    if report_only:
         report_path = asyncio.run(
-            generate_report(settings.data_dir, target_date, analyzer=analyzer)
+            generate_report(
+                settings.data_dir,
+                target_date,
+                analyzer=analyzer,
+                extract_only=args.extract,
+                synthesize_only=args.synthesize,
+                numerical=numerical_cfg,
+                cwa_api_key=settings.cwa_api_key,
+            )
         )
         logger.info("Report-only mode complete: {}", report_path)
     else:
-        asyncio.run(run_collection(target_date, settings, sources, analyzer=analyzer))
+        asyncio.run(
+            run_collection(
+                target_date,
+                settings,
+                sources,
+                analyzer=analyzer,
+                numerical=numerical_cfg,
+            )
+        )
 
 
 if __name__ == "__main__":

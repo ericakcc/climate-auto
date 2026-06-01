@@ -10,46 +10,78 @@ class BaseAnalyzer(ABC):
     """Abstract base class for chart image analyzers."""
 
     @abstractmethod
-    async def analyze(self, chart: ChartImage, image_path: Path) -> str:
-        """Analyze a chart image and return descriptive text.
+    async def extract_info(self, chart: ChartImage, image_path: Path) -> str:
+        """Extract concise, precise information from a single chart image.
 
         Args:
             chart: Chart metadata.
             image_path: Absolute path to the image file.
 
         Returns:
-            Analysis text for the chart.
+            Extracted information text for the chart.
         """
 
-    async def analyze_batch(
+    @abstractmethod
+    async def synthesize(
+        self,
+        extractions: dict[str, str],
+        charts: list[tuple[ChartImage, Path]],
+    ) -> str:
+        """Synthesize all extracted chart information into a unified diagnosis.
+
+        Args:
+            extractions: Mapping of chart relative_path to extracted info text.
+            charts: All chart metadata with paths for reference.
+
+        Returns:
+            Unified weather diagnosis text.
+        """
+
+    async def extract_all(
         self,
         charts: list[tuple[ChartImage, Path]],
-        section_context: str = "",
     ) -> dict[str, str]:
-        """Batch analyze multiple charts. Default: per-chart calls.
+        """Extract information from all charts. Default: sequential per-chart calls.
 
         Args:
             charts: List of (chart metadata, image absolute path) tuples.
-            section_context: Optional section title for context.
 
         Returns:
-            Mapping of chart relative_path to analysis text.
+            Mapping of chart relative_path to extracted info text.
         """
         results: dict[str, str] = {}
         for chart, image_path in charts:
-            results[chart.relative_path] = await self.analyze(chart, image_path)
+            info = await self.extract_info(chart, image_path)
+            if info:
+                results[chart.relative_path] = info
         return results
 
 
 class PlaceholderAnalyzer(BaseAnalyzer):
-    """Placeholder analyzer that returns empty analysis (template shows '待分析')."""
+    """Placeholder analyzer that returns empty analysis."""
 
-    async def analyze(self, chart: ChartImage, image_path: Path) -> str:
-        """Return empty string; template will display placeholder text.
+    async def extract_info(self, chart: ChartImage, image_path: Path) -> str:
+        """Return empty string.
 
         Args:
             chart: Chart metadata.
             image_path: Absolute path to the image file.
+
+        Returns:
+            Empty string.
+        """
+        return ""
+
+    async def synthesize(
+        self,
+        extractions: dict[str, str],
+        charts: list[tuple[ChartImage, Path]],
+    ) -> str:
+        """Return empty string.
+
+        Args:
+            extractions: Mapping of chart relative_path to extracted info.
+            charts: All chart metadata with paths.
 
         Returns:
             Empty string.
