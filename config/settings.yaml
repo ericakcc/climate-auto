@@ -50,11 +50,20 @@ sources:
   cwa_marine:
     enabled: true
 
+# LLM chart analysis. Runs via the claude-agent-sdk, which delegates to the
+# logged-in `claude` CLI. If ANTHROPIC_API_KEY is NOT set in the environment,
+# calls draw from your Claude subscription's monthly Agent SDK credit pool
+# instead of being billed per-token. See README "LLM analysis" for setup.
 analyzer:
   enabled: false
   model: "claude-sonnet-4-6"
   max_turns: 15
+  # Per-call ceiling on the SDK's *reported* cost (USD). Under a subscription
+  # this is informational (no per-token billing); under an API key it caps spend
+  # per agent call — note total spend ~= calls x this value, not a global cap.
   budget_limit_usd: 5.0
+  # Parallel chart extractions. Lower this if you hit subscription rate limits.
+  concurrency: 3
 
 # Numeric (route-2) pipeline: compute fields from ECMWF open-data instead of
 # reading GIFs with the vision model. Enable with `enabled: true` or `--numeric`.

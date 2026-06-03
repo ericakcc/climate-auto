@@ -32,6 +32,23 @@ uv run playwright install chromium
 uv sync --extra llm
 ```
 
+### LLM analysis: subscription vs API billing
+
+The optional LLM analysis runs through the `claude-agent-sdk`, which delegates
+to the logged-in `claude` CLI. **How the calls are billed depends on your
+environment:**
+
+- **Claude subscription (Pro/Max)** — log in once with `claude` (or
+  `claude /login`) and make sure **`ANTHROPIC_API_KEY` is *not* set**. Calls then
+  draw from your subscription's monthly Agent SDK credit pool (Pro $20, Max 5x
+  $100, Max 20x $200), separate from your chat usage — no per-token charges.
+- **Anthropic API key** — set `ANTHROPIC_API_KEY`. It takes precedence over the
+  subscription and you are billed per token. Use `analyzer.budget_limit_usd` to
+  cap per-call spend.
+
+> ⚠️ If both are present, the API key wins and you pay per token. To use the
+> subscription, keep `ANTHROPIC_API_KEY` out of your shell and `.env`.
+
 ## Usage
 
 ### Collect data and generate report
@@ -148,6 +165,22 @@ crontab -l
 > ```cron
 > PATH=/usr/local/bin:/usr/bin:/bin:/Users/yourname/.local/bin
 > ```
+
+### Running LLM analysis from cron (subscription)
+
+The interactive `claude` login may not be readable from a headless cron job.
+For reliable subscription-billed runs, generate a long-lived token once:
+
+```bash
+claude setup-token   # opens a browser to authorize; prints CLAUDE_CODE_OAUTH_TOKEN
+```
+
+Then provide it in the cron entry (and **do not** set `ANTHROPIC_API_KEY`, or
+you'll be billed per token instead):
+
+```cron
+30 8 * * * cd /path/to/climate-auto && CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat-xxxx /path/to/uv run climate-auto --report-only --analyze >> /path/to/climate-auto/cron.log 2>&1
+```
 
 ## Analysis architecture
 
