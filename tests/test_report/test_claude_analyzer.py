@@ -136,6 +136,43 @@ async def test_extract_all_parallel() -> None:
 
 
 @pytest.mark.asyncio
+async def test_extract_all_logs_error_when_all_fail() -> None:
+    """When every extraction is empty, extract_all logs an error and returns {}."""
+    from loguru import logger
+
+    charts = [
+        (
+            ChartImage(relative_path="500.png", description="500hPa"),
+            Path("/data/500.png"),
+        ),
+        (
+            ChartImage(relative_path="850.png", description="850hPa"),
+            Path("/data/850.png"),
+        ),
+    ]
+
+    async def mock_query(**kwargs):
+        msg = MagicMock()
+        msg.result = ""  # empty result => extraction failed
+        yield msg
+
+    messages: list[str] = []
+    sink_id = logger.add(messages.append, level="ERROR", format="{message}")
+    try:
+        mock_sdk = _make_mock_sdk(mock_query)
+        with patch.dict(sys.modules, {"claude_agent_sdk": mock_sdk}):
+            from climate_auto.report.claude_analyzer import ClaudeAnalyzer
+
+            analyzer = ClaudeAnalyzer(AnalyzerConfig())
+            results = await analyzer.extract_all(charts)
+    finally:
+        logger.remove(sink_id)
+
+    assert results == {}
+    assert any("All" in m and "failed" in m for m in messages)
+
+
+@pytest.mark.asyncio
 async def test_synthesize_produces_diagnosis() -> None:
     """synthesize returns unified weather diagnosis."""
     extractions = {
@@ -315,9 +352,7 @@ async def test_extract_info_routes_skewt_to_two_pass() -> None:
         from climate_auto.report.claude_analyzer import ClaudeAnalyzer
 
         analyzer = ClaudeAnalyzer(AnalyzerConfig())
-        result = await analyzer.extract_info(
-            chart, Path("/data/skewt_Taipei.gif")
-        )
+        result = await analyzer.extract_info(chart, Path("/data/skewt_Taipei.gif"))
 
     assert "低層近飽和" in result
     assert call_count == 2
