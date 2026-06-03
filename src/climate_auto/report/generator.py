@@ -440,6 +440,11 @@ async def generate_report(
             numeric_extractions: dict[str, str] = {}
             if use_numeric:
                 patterns = numerical.replace_chart_patterns
+                if not patterns:
+                    logger.warning(
+                        "Numeric route enabled but replace_chart_patterns is "
+                        "empty; numeric blocks won't replace any chart section"
+                    )
                 replaced_paths = {
                     chart.relative_path
                     for chart, _ in all_charts

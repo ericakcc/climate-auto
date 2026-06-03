@@ -8,6 +8,10 @@ from loguru import logger
 
 from climate_auto.storage import get_date_dir
 
+# Top-level files in the report folder that hold human work and must survive a
+# rebuild (the human-in-the-loop --extract → edit → --synthesize workflow).
+_PRESERVE_ON_REBUILD = frozenset({"extractions.md", "extractions.json"})
+
 # Mapping: report section -> (source_dir, filename glob pattern, target subfolder)
 # Based on TACOCO discussion meeting report structure
 REPORT_FILE_MAPPING: list[tuple[str, str, str, str]] = [
@@ -92,8 +96,16 @@ def build_report_folder(base_dir: Path, target_date: date) -> Path:
     date_dir = get_date_dir(base_dir, target_date)
     report_dir = date_dir / "report"
 
+    # Clear stale chart folders but preserve human-edited files (e.g. a
+    # hand-corrected extractions.md), so re-running collection doesn't wipe work.
     if report_dir.exists():
-        shutil.rmtree(report_dir)
+        for child in report_dir.iterdir():
+            if child.name in _PRESERVE_ON_REBUILD:
+                continue
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
 
     copied = 0
     skipped = 0

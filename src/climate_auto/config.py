@@ -15,7 +15,7 @@ class AnalyzerConfig(BaseModel):
     model: str = "claude-sonnet-4-6"
     max_turns: int = 15
     budget_limit_usd: float = 5.0
-    concurrency: int = 5
+    concurrency: int = 3
 
 
 class NumericalConfig(BaseModel):

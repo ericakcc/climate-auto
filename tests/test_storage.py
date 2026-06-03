@@ -37,3 +37,12 @@ def test_save_and_load_manifest(tmp_path: Path) -> None:
 def test_load_manifest_not_found(tmp_path: Path) -> None:
     result = load_manifest(tmp_path, date(2026, 1, 1))
     assert result is None
+
+
+def test_load_manifest_corrupted_returns_none(tmp_path: Path) -> None:
+    target_date = date(2026, 3, 19)
+    date_dir = get_date_dir(tmp_path, target_date)
+    date_dir.mkdir(parents=True)
+    (date_dir / "manifest.json").write_text("{ not valid json", encoding="utf-8")
+
+    assert load_manifest(tmp_path, target_date) is None

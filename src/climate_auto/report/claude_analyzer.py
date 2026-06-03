@@ -432,9 +432,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
                 try:
                     info = await self.extract_info(chart, image_path)
                     if info:
-                        logger.info(
-                            "Extraction complete for '{}'", chart.relative_path
-                        )
+                        logger.info("Extraction complete for '{}'", chart.relative_path)
                     else:
                         logger.warning(
                             "Extraction returned empty for '{}'",
@@ -449,23 +447,26 @@ class ClaudeAnalyzer(BaseAnalyzer):
                     )
                     return chart.relative_path, ""
 
-        tasks = [
-            _extract_with_limit(chart, image_path)
-            for chart, image_path in charts
-        ]
+        tasks = [_extract_with_limit(chart, image_path) for chart, image_path in charts]
         results = await asyncio.gather(*tasks)
 
-        return {
-            rel_path: info for rel_path, info in results if info
-        }
+        successful = {rel_path: info for rel_path, info in results if info}
+        failed = len(results) - len(successful)
+        if not successful:
+            logger.error(
+                "All {} chart extractions failed; report will have no LLM analysis",
+                len(results),
+            )
+        elif failed:
+            logger.warning("{}/{} chart extractions failed", failed, len(results))
+
+        return successful
 
     # ------------------------------------------------------------------
     # Private extraction methods
     # ------------------------------------------------------------------
 
-    async def _extract_standard(
-        self, chart: ChartImage, image_path: Path
-    ) -> str:
+    async def _extract_standard(self, chart: ChartImage, image_path: Path) -> str:
         """Extract information from a standard (non-Skew-T) chart.
 
         Args:
@@ -494,9 +495,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
             )
             return ""
 
-    async def _extract_skewt(
-        self, chart: ChartImage, image_path: Path
-    ) -> str:
+    async def _extract_skewt(self, chart: ChartImage, image_path: Path) -> str:
         """Two-pass Skew-T extraction: structured data then interpretation.
 
         Args:
@@ -527,9 +526,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
                 )
                 return ""
 
-            logger.info(
-                "Skew-T data extraction complete for '{}'", chart.relative_path
-            )
+            logger.info("Skew-T data extraction complete for '{}'", chart.relative_path)
 
         except Exception as e:
             logger.error(
@@ -554,9 +551,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
             )
 
             if analysis_text:
-                logger.info(
-                    "Skew-T analysis complete for '{}'", chart.relative_path
-                )
+                logger.info("Skew-T analysis complete for '{}'", chart.relative_path)
             else:
                 logger.warning(
                     "Skew-T analysis returned empty for '{}'",
