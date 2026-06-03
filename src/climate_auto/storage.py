@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from loguru import logger
+from pydantic import ValidationError
 
 from climate_auto.models import CollectionManifest, SourceName
 
@@ -71,7 +72,11 @@ def load_manifest(base_dir: Path, target_date: date) -> CollectionManifest | Non
         Loaded manifest or None if not found.
     """
     manifest_path = get_date_dir(base_dir, target_date) / "manifest.json"
-    if manifest_path.exists():
+    if not manifest_path.exists():
+        return None
+    try:
         raw = json.loads(manifest_path.read_text())
         return CollectionManifest(**raw)
-    return None
+    except (json.JSONDecodeError, ValidationError, OSError) as e:
+        logger.warning("Failed to load manifest {}: {}", manifest_path, e)
+        return None

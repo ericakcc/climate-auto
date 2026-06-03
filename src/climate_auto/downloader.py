@@ -58,7 +58,16 @@ async def download_image(
                         error="Response is not image content",
                     )
 
-                file_path.write_bytes(content)
+                try:
+                    file_path.write_bytes(content)
+                except OSError as e:
+                    logger.error("Failed to write {}: {}", file_path, e)
+                    return DownloadResult(
+                        product=product,
+                        status=DownloadStatus.FAILED,
+                        http_status=resp.status_code,
+                        error=f"Write failed: {e}",
+                    )
                 logger.debug(
                     "Downloaded: {} ({} bytes)", product.filename, len(content)
                 )
