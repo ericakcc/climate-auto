@@ -24,6 +24,8 @@
     statusEyebrow: $("statusEyebrow"),
     dateSelect: $("dateSelect"),
     loadBtn: $("loadBtn"),
+    newDateInput: $("newDateInput"),
+    addDateBtn: $("addDateBtn"),
     reloadDatesBtn: $("reloadDatesBtn"),
     btnCollect: $("btnCollect"),
     btnExtract: $("btnExtract"),
@@ -180,6 +182,33 @@
 
   function currentDate() {
     return els.dateSelect.value || "";
+  }
+
+  function todayLocal() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+
+  // Add a brand-new date (not yet collected) to the picker and select it, so
+  // the user can run Collect on it. The backend creates the folder on collect.
+  function addDate() {
+    const value = els.newDateInput.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      showNotice("warn", "請先選擇有效日期（YYYY-MM-DD）。");
+      return;
+    }
+    const exists = [...els.dateSelect.options].some((o) => o.value === value);
+    if (!exists) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = value + "  [新]";
+      els.dateSelect.insertBefore(opt, els.dateSelect.firstChild);
+    }
+    els.dateSelect.disabled = false;
+    els.dateSelect.value = value;
+    showNotice("ok", `已新增 ${value}，按「蒐集 Collect」開始下載資料。`);
+    loadExtractions(value);
   }
 
   // ---- extraction blocks --------------------------------------------------
@@ -574,6 +603,8 @@
   // ---- events -------------------------------------------------------------
   els.loadBtn.addEventListener("click", () => loadExtractions(currentDate()));
   els.dateSelect.addEventListener("change", () => loadExtractions(currentDate()));
+  els.newDateInput.value = todayLocal();
+  els.addDateBtn.addEventListener("click", addDate);
   els.reloadDatesBtn.addEventListener("click", () => loadDates(currentDate()));
   els.btnCollect.addEventListener("click", () => startJob("/api/collect", "collect"));
   els.btnExtract.addEventListener("click", () => startJob("/api/extract", "extract"));

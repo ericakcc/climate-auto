@@ -72,6 +72,10 @@ select#dateSelect{appearance:none;font-family:var(--fm);font-size:14px;color:var
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%238ea3c4' stroke-width='1.6'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 13px center;cursor:pointer}
 select#dateSelect:focus{outline:none;border-color:var(--num)}
+input#newDateInput{font-family:var(--fm);font-size:14px;color:var(--sky);
+  background:rgba(255,255,255,.05);border:1px solid var(--hair-2);border-radius:10px;padding:9px 13px;flex:1;min-width:0}
+input#newDateInput:focus{outline:none;border-color:var(--num)}
+input#newDateInput::-webkit-calendar-picker-indicator{filter:invert(.7);cursor:pointer}
 
 /* ===== Buttons / toolbar ===== */
 .btn{font-family:var(--fm);font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--sky);cursor:pointer;
@@ -247,6 +251,10 @@ footer.foot b{color:var(--smut)}
           <select id="dateSelect" aria-label="選擇資料日期"></select>
           <button class="btn ghost" id="loadBtn" type="button">載入</button>
         </div>
+        <div class="selrow">
+          <input type="date" id="newDateInput" aria-label="新增資料日期" />
+          <button class="btn ghost" id="addDateBtn" type="button">➕ 新增日期</button>
+        </div>
       </div>
     </div>
   </header>
@@ -262,7 +270,7 @@ footer.foot b{color:var(--smut)}
       </div>
       <div class="divider"></div>
       <label class="numcheck" title="蒐集／分析時啟用 ECMWF 數值精算">
-        <input type="checkbox" id="numericChk" /> numeric（ECMWF 數值）
+        <input type="checkbox" id="numericChk" checked /> numeric（ECMWF 數值）
       </label>
       <div class="tb-spacer"></div>
       <button class="btn ghost" id="reloadDatesBtn" type="button">↻ 重整日期</button>
