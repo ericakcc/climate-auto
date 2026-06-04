@@ -205,7 +205,7 @@
     els.dateSelect.disabled = false;
     els.dateSelect.value = value;
     showNotice("ok", `已新增 ${value}，按「蒐集 Collect」開始下載資料。`);
-    loadExtractions(value);
+    showDate(value);
   }
 
   // ---- extraction blocks --------------------------------------------------
@@ -385,12 +385,23 @@
   async function loadReport(dateStr) {
     if (!dateStr) return;
     const res = await fetchJSON("/api/report?date=" + encodeURIComponent(dateStr));
+    if (res.status === 404) {
+      // No report generated for this date yet — hide the section quietly.
+      els.reportSection.classList.add("hidden");
+      return;
+    }
     if (!res.ok || !res.body) {
       const detail = (res.body && res.body.detail) || "HTTP " + res.status;
       showNotice("warn", "無法載入產出報告：" + detail);
       return;
     }
     renderReport(res.body);
+  }
+
+  // Load both the editable extractions and the rendered report for a date.
+  async function showDate(dateStr) {
+    await loadExtractions(dateStr);
+    await loadReport(dateStr);
   }
 
   function renderDownloads(dateStr) {
@@ -614,15 +625,15 @@
       setLogState("idle", "閒置 IDLE");
     }
 
-    // auto-load extractions for the initially selected date
+    // auto-load extractions + report for the initially selected date
     if (currentDate()) {
-      await loadExtractions(currentDate());
+      await showDate(currentDate());
     }
   }
 
   // ---- events -------------------------------------------------------------
-  els.loadBtn.addEventListener("click", () => loadExtractions(currentDate()));
-  els.dateSelect.addEventListener("change", () => loadExtractions(currentDate()));
+  els.loadBtn.addEventListener("click", () => showDate(currentDate()));
+  els.dateSelect.addEventListener("change", () => showDate(currentDate()));
   els.newDateInput.value = todayLocal();
   els.addDateBtn.addEventListener("click", addDate);
   els.reloadDatesBtn.addEventListener("click", () => loadDates(currentDate()));
