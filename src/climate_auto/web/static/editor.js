@@ -77,10 +77,6 @@
     return { ok: resp.ok, status: resp.status, body };
   }
 
-  function isNumericKey(key) {
-    return typeof key === "string" && key.indexOf("numeric/") === 0;
-  }
-
   // ---- log console --------------------------------------------------------
   function appendLog(line) {
     const div = document.createElement("div");
@@ -226,10 +222,16 @@
     els.blocks.appendChild(card);
   }
 
+  const PROV = {
+    numeric: { cls: "num", label: "數值計算", edge: "e-num" },
+    observation: { cls: "obs", label: "觀測資料", edge: "e-obs" },
+    vision: { cls: "vis", label: "AI 讀圖", edge: "e-vis" },
+  };
+
   function buildBlockCard(block) {
-    const numeric = isNumericKey(block.key);
+    const prov = PROV[block.provenance] || PROV.vision;
     const card = document.createElement("div");
-    card.className = "page block-card " + (numeric ? "e-num" : "e-vis");
+    card.className = "page block-card " + prov.edge;
     card.dataset.key = block.key;
 
     // head: key label + provenance pill
@@ -241,11 +243,11 @@
     head.appendChild(keyEl);
 
     const pill = document.createElement("span");
-    pill.className = "prov " + (numeric ? "num" : "vis");
-    pill.innerHTML = '<span class="sq"></span>' + (numeric ? "數值計算" : "AI 讀圖");
+    pill.className = "prov " + prov.cls;
+    pill.innerHTML = '<span class="sq"></span>' + prov.label;
     head.appendChild(pill);
 
-    if (!block.exists && block.image_url == null && !numeric) {
+    if (block.provenance === "vision" && !block.exists && block.image_url == null) {
       const flag = document.createElement("span");
       flag.className = "bc-flag";
       flag.textContent = "無對應圖檔";
@@ -268,7 +270,8 @@
       const left = document.createElement("span");
       left.textContent = block.key;
       const right = document.createElement("span");
-      right.textContent = "AI 讀圖來源";
+      right.textContent =
+        block.provenance === "vision" ? "AI 讀圖來源" : "圖供對照（數字來自格點）";
       cap.appendChild(left);
       cap.appendChild(right);
       fig.appendChild(img);

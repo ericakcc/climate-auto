@@ -25,6 +25,8 @@ class ExtractionBlock(BaseModel):
     text: str
     exists: bool
     image_url: str | None = None
+    # "numeric" (computed field), "observation" (measured), or "vision" (LLM read).
+    provenance: str = "vision"
 
 
 class ExtractionsResponse(BaseModel):

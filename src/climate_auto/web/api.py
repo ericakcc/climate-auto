@@ -48,6 +48,27 @@ def _image_url(date_str: str, key: str) -> str:
     return f"/api/image?date={date_str}&path={quote(key, safe='/')}"
 
 
+def _provenance(key: str, text: str) -> str:
+    """Classify a block as numeric / observation / vision.
+
+    Numeric blocks the route re-keyed onto a chart path keep a leading marker
+    in their text, so we cannot rely on the key prefix alone.
+
+    Args:
+        key: Extraction key (chart relative_path or ``numeric/...``).
+        text: The extraction body.
+
+    Returns:
+        "numeric", "observation", or "vision".
+    """
+    head = text.lstrip()
+    if head.startswith("（數值觀測"):
+        return "observation"
+    if head.startswith("（數值計算") or key.startswith("numeric/"):
+        return "numeric"
+    return "vision"
+
+
 async def list_dates(request: Request) -> JSONResponse:
     """List data dates (most recent first) with artifact-presence flags."""
     data_dir = _data_dir(request)
@@ -90,6 +111,7 @@ async def get_extractions(request: Request) -> JSONResponse:
                     text=text,
                     exists=has_image,
                     image_url=_image_url(date_str, key) if has_image else None,
+                    provenance=_provenance(key, text),
                 )
             )
     return JSONResponse(ExtractionsResponse(date=date_str, blocks=blocks).model_dump())

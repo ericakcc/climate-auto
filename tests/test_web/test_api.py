@@ -49,6 +49,34 @@ def test_get_extractions_builds_blocks_and_image_urls(client, data_dir: Path) ->
     assert numeric_block["image_url"] is None
 
 
+def test_get_extractions_marks_provenance(client, data_dir: Path) -> None:
+    report_dir = make_report_dir(data_dir, "2026-06-04")
+    save_extractions(
+        report_dir,
+        {
+            # numeric block re-keyed onto a chart path (computed, not vision)
+            "1_review/analysis/ECMWF500_x_f000.gif": (
+                "（數值計算，500hPa 高度場，2026-06-04 00Z）\n- 高壓中心：5915 gpm"
+            ),
+            # genuine vision reading of an image
+            "1_review/surface/surface_taiwan.gif": "地面天氣圖顯示鋒面通過台灣北部。",
+            # numeric-keyed forecast sounding
+            "numeric/f24h 預報_預報探空": "（數值計算，來源 ECMWF-fc）\n- SBCAPE 63 J/kg",
+            # CWA surface station observation
+            "numeric/地面測站觀測": "（數值觀測，CWA 地面測站，2026-06-04）\n- 臺北 26°C",
+        },
+    )
+
+    resp = client.get("/api/extractions", params={"date": "2026-06-04"})
+
+    assert resp.status_code == 200
+    prov = {b["key"]: b["provenance"] for b in resp.json()["blocks"]}
+    assert prov["1_review/analysis/ECMWF500_x_f000.gif"] == "numeric"
+    assert prov["1_review/surface/surface_taiwan.gif"] == "vision"
+    assert prov["numeric/f24h 預報_預報探空"] == "numeric"
+    assert prov["numeric/地面測站觀測"] == "observation"
+
+
 def test_get_extractions_missing_file_returns_empty_blocks(
     client, data_dir: Path
 ) -> None:
