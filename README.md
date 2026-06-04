@@ -9,6 +9,7 @@ Automated weather data collection and report generation for the [TACOCO](https:/
 - **Markdown report generation** — renders structured daily weather reports via Jinja2 templates
 - **LLM chart analysis** (optional) — two-phase architecture: parallel per-chart extraction + unified weather diagnosis via Claude Agent SDK
 - **Numeric route** (optional) — computes 500/700/850 hPa height fields, 850 hPa moisture flux, and forecast soundings numerically from ECMWF open-data instead of reading the corresponding charts with the vision model
+- **Web editor** (optional) — a local browser UI to run the whole pipeline, edit the per-chart extractions next to their images, and render the synthesized report inline, with live streaming progress
 - **DOCX export** — converts the Markdown report to Word format
 
 ## Prerequisites
@@ -138,6 +139,35 @@ numerical:
   # Image charts to skip in vision because the numeric route replaces them
   replace_chart_patterns: ["ECMWF500", "ECMWF700", "ECMWF850mf", "dailyrn"]
 ```
+
+## Web editor (human-in-the-loop GUI)
+
+The same human-in-the-loop flow (collect → extract → **edit** → synthesize) is also
+available as a local web page, so you can review and correct the per-chart
+extractions next to their charts and run each step from buttons instead of the CLI.
+
+```bash
+# Install the web extra (and llm, since extract/synthesize use the analyzer)
+uv sync --extra web --extra llm
+
+# Launch the editor (binds to 127.0.0.1:8765 by default)
+uv run climate-auto-web --port 8765
+# …or, equivalently, via the main CLI:
+uv run climate-auto --serve --port 8765
+```
+
+Then open <http://127.0.0.1:8765>:
+
+1. Pick a date, then run **Collect** / **Extract** (progress streams live into the log console).
+2. Edit each extraction block in its text box — the matching chart image is shown beside it. Click **Save** to write your edits back to `extractions.md`.
+3. Click **Synthesize** — when it finishes, the generated `daily_report.md` is rendered inline (charts included).
+
+> **Local-only by design.** The server runs LLM calls (which cost money or
+> subscription credit) and writes files, so it binds to `127.0.0.1` and has no
+> auth layer — localhost is the security boundary. Pass `--host 0.0.0.0` only if
+> you understand the implications. Launch it from a shell where the `claude` CLI
+> is logged in (or with `ANTHROPIC_API_KEY` set); otherwise extract/synthesize
+> jobs surface an authentication error in the log console.
 
 ## Schedule daily runs
 
