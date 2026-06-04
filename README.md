@@ -8,6 +8,7 @@ Automated weather data collection and report generation for the [TACOCO](https:/
 - **Report folder curation** — selects relevant charts and organizes them by report section
 - **Markdown report generation** — renders structured daily weather reports via Jinja2 templates
 - **LLM chart analysis** (optional) — two-phase architecture: parallel per-chart extraction + unified weather diagnosis via Claude Agent SDK
+- **Numeric route** (optional) — computes 500/700/850 hPa height fields, 850 hPa moisture flux, and forecast soundings numerically from ECMWF open-data instead of reading the corresponding charts with the vision model
 - **DOCX export** — converts the Markdown report to Word format
 
 ## Prerequisites
@@ -30,6 +31,9 @@ uv run playwright install chromium
 
 # (Optional) Install LLM analysis support
 uv sync --extra llm
+
+# (Optional) Install the numeric route (ECMWF open-data) support
+uv sync --extra numerical
 ```
 
 ### LLM analysis: subscription vs API billing
@@ -68,6 +72,9 @@ uv run climate-auto --report-only --date 2026-03-19
 
 # Generate report with full LLM analysis (extract + synthesize in one go)
 uv run climate-auto --report-only --analyze --date 2026-03-19
+
+# Same, but compute ECMWF fields numerically instead of reading those charts
+uv run climate-auto --report-only --analyze --numeric --date 2026-03-19
 ```
 
 ### Human-in-the-loop analysis
@@ -98,8 +105,9 @@ uv run climate-auto --synthesize --date 2026-03-19
 | `--analyze` | Full LLM pipeline: extract + synthesize in one run |
 | `--extract` | Phase 1 only: extract chart info, save `extractions.md` |
 | `--synthesize` | Phase 2 only: load `extractions.md`, synthesize and render report |
+| `--numeric` | Enable the numeric (ECMWF open-data) route: compute height/moisture/sounding fields and merge into extractions instead of reading those charts |
 
-> `--analyze`, `--extract`, `--synthesize` are mutually exclusive. `--extract` and `--synthesize` imply `--report-only`.
+> `--analyze`, `--extract`, `--synthesize` are mutually exclusive. `--extract` and `--synthesize` imply `--report-only`. `--numeric` can be combined with any of them.
 
 ### Configuration
 
@@ -118,6 +126,17 @@ analyzer:
   enabled: false
   model: "claude-sonnet-4-6"
   budget_limit_usd: 5.0
+  concurrency: 3          # parallel per-chart extractions (lower if rate-limited)
+
+# Numeric (ECMWF open-data) route — see "Numeric route" below
+numerical:
+  enabled: false
+  run_time: 0             # ECMWF run hour (0/6/12/18)
+  steps: [0, 24, 48]      # 0 = analysis, then forecast hours
+  sounding_lat: 25.0      # forecast-sounding location (Taipei)
+  sounding_lon: 121.5
+  # Image charts to skip in vision because the numeric route replaces them
+  replace_chart_patterns: ["ECMWF500", "ECMWF700", "ECMWF850mf", "dailyrn"]
 ```
 
 ## Schedule daily runs
@@ -255,7 +274,7 @@ When `--analyze` is enabled, the report generator uses a **two-phase LLM pipelin
 
 ### Phase 1: Per-chart extraction (`--extract`)
 
-Each chart image gets its own independent agent call (up to 5 concurrent). The agent uses the **Read** tool to view the image and outputs a concise, factual description of visible meteorological features — no diagnosis or forecast at this stage.
+Each chart image gets its own independent agent call (3 concurrent by default; tune via `analyzer.concurrency`). The agent uses the **Read** tool to view the image and outputs a concise, factual description of visible meteorological features — no diagnosis or forecast at this stage.
 
 Results are saved to `extractions.md` — a human-readable Markdown file where each chart is a `##` section. You can review and edit this file before proceeding to Phase 2.
 
@@ -277,6 +296,17 @@ A single synthesis agent receives **all** extraction results (from `extractions.
 | Charts are independent for extraction | Parallel agent calls (asyncio) |
 | Skew-T diagrams have dense numeric data | Two-pass extraction → interpretation |
 | Agent failures shouldn't break the report | Graceful degradation (shows "待分析") |
+
+### Numeric route (ECMWF open-data)
+
+By default every chart is read by the vision model. With `--numeric` (or `numerical.enabled: true`), the pipeline instead fetches **ECMWF open-data** and computes the corresponding quantities numerically:
+
+- 500 / 700 / 850 hPa height fields and 850 hPa moisture flux
+- Forecast soundings (SBCAPE/CIN, LI, K, SI, TT, LCL/LFC/EL, PW) at a configurable lat/lon
+
+These numeric blocks are merged into `extractions.md` exactly like image extractions — so they stay human-editable and flow into the same Phase 2 synthesis. Charts with no free numeric source (radar, satellite, MJO, *today's observed* sounding) are left on the vision path.
+
+Use `numerical.replace_chart_patterns` to list the image charts to skip in vision because the numeric route now covers them. Requires the optional dependencies (`uv sync --extra numerical`); the route degrades gracefully to "no numeric data" on any failure (missing extra, no connectivity, ECMWF archive gap).
 
 ## Output structure
 

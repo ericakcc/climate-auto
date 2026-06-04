@@ -114,7 +114,7 @@ async def run_extraction(
     Args:
         analyzer: Chart analyzer instance.
         all_charts: List of (chart metadata, image absolute path) tuples.
-        report_dir: Path to the report directory (for saving extractions.json).
+        report_dir: Path to the report directory (for saving extractions.md).
 
     Returns:
         Mapping of chart relative_path to extracted info text.
@@ -394,8 +394,8 @@ async def generate_report(
 
     Modes:
       - Default (no analyzer): Render template with placeholder text.
-      - extract_only: Run Phase 1, save extractions.json, render without synthesis.
-      - synthesize_only: Load extractions.json, run Phase 2, render full report.
+      - extract_only: Run Phase 1, save extractions.md, render without synthesis.
+      - synthesize_only: Load extractions.md, run Phase 2, render full report.
       - Full (analyzer, no flags): Phase 1 → save → Phase 2 → render.
 
     Args:

@@ -220,14 +220,14 @@ def main() -> None:
         "--extract",
         action="store_true",
         default=False,
-        help="Phase 1 only: extract chart info, save extractions.json. "
+        help="Phase 1 only: extract chart info, save extractions.md. "
         "Edit the file, then run --synthesize.",
     )
     analysis_group.add_argument(
         "--synthesize",
         action="store_true",
         default=False,
-        help="Phase 2 only: load extractions.json, synthesize diagnosis, "
+        help="Phase 2 only: load extractions.md, synthesize diagnosis, "
         "render report.",
     )
     parser.add_argument(
