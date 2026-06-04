@@ -50,6 +50,10 @@ def build_app(
         Route("/api/image", api.get_image, methods=["GET"]),
         Route("/api/report", api.get_report, methods=["GET"]),
         Route("/api/job", api.get_job, methods=["GET"]),
+        Route("/api/collect", api.post_collect, methods=["POST"]),
+        Route("/api/extract", api.post_extract, methods=["POST"]),
+        Route("/api/synthesize", api.post_synthesize, methods=["POST"]),
+        Route("/api/stream/{job_id}", api.stream, methods=["GET"]),
     ]
 
     app = Starlette(routes=routes)

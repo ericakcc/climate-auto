@@ -2,20 +2,31 @@
 
 import mimetypes
 import re
+from collections.abc import Awaitable, Callable
+from datetime import date as date_cls
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from climate_auto.report.generator import load_extractions, save_extractions
+from climate_auto.config import Settings, load_settings
+from climate_auto.report.generator import (
+    generate_report,
+    load_extractions,
+    save_extractions,
+)
+from climate_auto.web.jobs import JobBusyError
 from climate_auto.web.paths import safe_image_path
 from climate_auto.web.schemas import (
     DateInfo,
     DatesResponse,
     ExtractionBlock,
     ExtractionsResponse,
+    JobStartedResponse,
     ReportResponse,
+    RunRequest,
     SaveExtractionsRequest,
     SaveResponse,
 )
@@ -81,9 +92,7 @@ async def get_extractions(request: Request) -> JSONResponse:
                     image_url=_image_url(date_str, key) if has_image else None,
                 )
             )
-    return JSONResponse(
-        ExtractionsResponse(date=date_str, blocks=blocks).model_dump()
-    )
+    return JSONResponse(ExtractionsResponse(date=date_str, blocks=blocks).model_dump())
 
 
 async def put_extractions(request: Request) -> JSONResponse:
@@ -138,3 +147,124 @@ async def get_job(request: Request) -> JSONResponse:
     """Return the current job-runner status."""
     manager = request.app.state.job_manager
     return JSONResponse(manager.status().model_dump())
+
+
+def _load_run_settings(request: Request) -> Settings:
+    """Load settings, forcing data_dir to the app's resolved data directory."""
+    settings = load_settings(request.app.state.config_path)
+    return settings.model_copy(update={"data_dir": request.app.state.data_dir})
+
+
+async def _start_job(
+    request: Request,
+    kind: str,
+    date_str: str,
+    coro_factory: Callable[[], Awaitable[Any]],
+) -> JSONResponse:
+    manager = request.app.state.job_manager
+    try:
+        job_id = await manager.start(kind, date_str, coro_factory)
+    except JobBusyError:
+        return JSONResponse(
+            {"detail": "another job is already running"}, status_code=409
+        )
+    return JSONResponse(JobStartedResponse(job_id=job_id).model_dump())
+
+
+def _build_analyzer(request: Request, settings: Settings) -> Any:
+    """Build the analyzer, mapping a missing llm extra to a clear error."""
+    return request.app.state.analyzer_factory(settings)
+
+
+async def post_collect(request: Request) -> JSONResponse:
+    """Start a data-collection job."""
+    req = RunRequest.model_validate(await request.json())
+    if not _DATE_RE.match(req.date):
+        return JSONResponse({"detail": "invalid date"}, status_code=400)
+
+    from climate_auto.main import run_collection
+    from climate_auto.models import SourceName
+
+    settings = _load_run_settings(request)
+    target = date_cls.fromisoformat(req.date)
+    numerical = settings.numerical
+    if req.numeric:
+        numerical = numerical.model_copy(update={"enabled": True})
+
+    sources = None
+    if req.sources:
+        try:
+            sources = [SourceName(s) for s in req.sources]
+        except ValueError:
+            return JSONResponse({"detail": "unknown source"}, status_code=400)
+
+    async def _coro() -> dict:
+        await run_collection(target, settings, sources=sources, numerical=numerical)
+        return {}
+
+    return await _start_job(request, "collect", req.date, _coro)
+
+
+async def post_extract(request: Request) -> JSONResponse:
+    """Start a Phase 1 extraction job."""
+    return await _run_report_job(request, extract_only=True, kind="extract")
+
+
+async def post_synthesize(request: Request) -> JSONResponse:
+    """Start a Phase 2 synthesis job."""
+    return await _run_report_job(request, synthesize_only=True, kind="synthesize")
+
+
+async def _run_report_job(
+    request: Request,
+    *,
+    kind: str,
+    extract_only: bool = False,
+    synthesize_only: bool = False,
+) -> JSONResponse:
+    req = RunRequest.model_validate(await request.json())
+    if not _DATE_RE.match(req.date):
+        return JSONResponse({"detail": "invalid date"}, status_code=400)
+
+    settings = _load_run_settings(request)
+    try:
+        analyzer = _build_analyzer(request, settings)
+    except ImportError:
+        return JSONResponse(
+            {"detail": "LLM support not installed. Run: uv sync --extra llm"},
+            status_code=400,
+        )
+
+    target = date_cls.fromisoformat(req.date)
+    numerical = settings.numerical
+    if req.numeric:
+        numerical = numerical.model_copy(update={"enabled": True})
+
+    async def _coro() -> dict:
+        await generate_report(
+            settings.data_dir,
+            target,
+            analyzer=analyzer,
+            extract_only=extract_only,
+            synthesize_only=synthesize_only,
+            numerical=numerical,
+            cwa_api_key=settings.cwa_api_key,
+        )
+        if synthesize_only:
+            return {"report_url": f"/api/report?date={req.date}"}
+        return {}
+
+    return await _start_job(request, kind, req.date, _coro)
+
+
+async def stream(request: Request) -> Response:
+    """Stream a job's progress as Server-Sent Events."""
+    job_id = request.path_params["job_id"]
+    manager = request.app.state.job_manager
+    if not manager.exists(job_id):
+        return JSONResponse({"detail": "unknown job"}, status_code=404)
+    return StreamingResponse(
+        manager.stream(job_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

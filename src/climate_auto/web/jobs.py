@@ -145,6 +145,10 @@ class JobManager:
             return self._current
         return self._recent.get(job_id)
 
+    def exists(self, job_id: str) -> bool:
+        """Whether the given job id is known (running or recently finished)."""
+        return self._lookup(job_id) is not None
+
     async def stream(self, job_id: str) -> AsyncIterator[str]:
         """Yield SSE-formatted strings for the given job until it completes.
 

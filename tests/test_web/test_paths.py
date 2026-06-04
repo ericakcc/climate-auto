@@ -13,10 +13,10 @@ def _make_report_image(data_dir: Path, date_str: str, rel: str) -> Path:
     return target
 
 
-def test_safe_image_path_returns_resolved_path_for_existing_file(tmp_path: Path) -> None:
-    expected = _make_report_image(
-        tmp_path, "2026-06-04", "1_review/sounding/skewt.gif"
-    )
+def test_safe_image_path_returns_resolved_path_for_existing_file(
+    tmp_path: Path,
+) -> None:
+    expected = _make_report_image(tmp_path, "2026-06-04", "1_review/sounding/skewt.gif")
 
     result = safe_image_path(tmp_path, "2026-06-04", "1_review/sounding/skewt.gif")
 
