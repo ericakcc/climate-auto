@@ -12,6 +12,41 @@ Automated weather data collection and report generation for the [TACOCO](https:/
 - **Web editor** (optional) — a local browser UI to run the whole pipeline, edit the per-chart extractions next to their images, and render the synthesized report inline, with live streaming progress
 - **DOCX export** — converts the Markdown report to Word format
 
+## Quick Start
+
+Cloning isn't quite enough — `.env` and `data/` are intentionally **not** in the
+repo, and some credentials are per-user. After cloning (needs Python ≥ 3.12 and
+[uv](https://docs.astral.sh/uv/)):
+
+```bash
+# 1. Install deps (web editor + LLM analysis; add --extra numerical for the numeric route)
+uv sync --extra web --extra llm
+
+# 2. Install the Playwright browser some scrapers use
+uv run playwright install chromium
+
+# 3. Provide your own CWA OpenData key
+cp .env.example .env          # then edit .env and fill in CWA_API_KEY
+
+# 4. Launch the local web editor, then open http://127.0.0.1:8765
+uv run climate-auto-web --port 8765
+```
+
+In the editor: pick (or **➕ 新增**) a date → **Collect** → **Extract** → review/edit
+the blocks → **Synthesize**. Prefer the CLI? See [Usage](#usage) below.
+
+**Each user supplies their own credentials — they are not shared and not in the repo:**
+
+- **CWA key** — apply at [CWA OpenData](https://opendata.cwa.gov.tw/devManual/insrtuction)
+  and put it in `.env`. Without it, the surface-station numeric block is disabled.
+- **LLM access** (for Extract/Synthesize) — either log in to the `claude` CLI
+  (subscription) **or** set `ANTHROPIC_API_KEY`. See the billing note below.
+- **No data ships** — `data/` is git-ignored, so a fresh clone is empty; run
+  **Collect** first to download charts.
+
+> The web editor binds to `127.0.0.1` and has no authentication — it's a local
+> single-user tool, not meant to be hosted for multiple people.
+
 ## Prerequisites
 
 - Python >= 3.12
