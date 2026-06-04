@@ -91,6 +91,8 @@ input#newDateInput::-webkit-calendar-picker-indicator{filter:invert(.7);cursor:p
 .btn.save{color:#06101f;background:var(--obs);border-color:transparent}
 .btn.save:hover:not(:disabled){background:#28b86a}
 .btn.ghost{background:transparent}
+.report-dl{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 6px}
+.report-dl a.btn{text-decoration:none}
 
 .toolbar{margin-top:26px;border:1px solid var(--hair);border-radius:16px;padding:16px 18px;
   background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0));
@@ -330,6 +332,7 @@ footer.foot b{color:var(--smut)}
     <div class="page e-syn">
       <h3 class="page-h">產出報告</h3>
       <div class="page-meta" id="reportMeta"></div>
+      <div class="report-dl" id="reportDownloads"></div>
       <div class="report-body" id="reportBody"></div>
     </div>
   </section>

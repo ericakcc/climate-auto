@@ -165,6 +165,35 @@ async def get_report(request: Request) -> JSONResponse:
     )
 
 
+_DOWNLOADS = {
+    "md": ("daily_report.md", "text/markdown"),
+    "docx": (
+        "daily_report.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ),
+}
+
+
+async def download(request: Request) -> Response:
+    """Serve the generated report file as a download attachment."""
+    date_str = request.query_params.get("date", "")
+    kind = request.query_params.get("kind", "")
+    if not _DATE_RE.match(date_str):
+        return JSONResponse({"detail": "invalid date"}, status_code=400)
+    if kind not in _DOWNLOADS:
+        return JSONResponse({"detail": "invalid kind"}, status_code=400)
+
+    filename, media_type = _DOWNLOADS[kind]
+    path = _report_dir(request, date_str) / filename
+    if not path.is_file():
+        return JSONResponse({"detail": "not found"}, status_code=404)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=f"daily_report_{date_str}.{kind}",
+    )
+
+
 async def get_job(request: Request) -> JSONResponse:
     """Return the current job-runner status."""
     manager = request.app.state.job_manager

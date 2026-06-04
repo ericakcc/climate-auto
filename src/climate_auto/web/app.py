@@ -62,6 +62,7 @@ def build_app(
         Route("/api/extractions", api.put_extractions, methods=["PUT"]),
         Route("/api/image", api.get_image, methods=["GET"]),
         Route("/api/report", api.get_report, methods=["GET"]),
+        Route("/api/download", api.download, methods=["GET"]),
         Route("/api/job", api.get_job, methods=["GET"]),
         Route("/api/collect", api.post_collect, methods=["POST"]),
         Route("/api/extract", api.post_extract, methods=["POST"]),

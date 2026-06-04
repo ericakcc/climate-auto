@@ -46,6 +46,7 @@
     reportSection: $("reportSection"),
     reportBody: $("reportBody"),
     reportMeta: $("reportMeta"),
+    reportDownloads: $("reportDownloads"),
     reportHint: $("reportHint"),
   };
 
@@ -392,6 +393,21 @@
     renderReport(res.body);
   }
 
+  function renderDownloads(dateStr) {
+    els.reportDownloads.innerHTML = "";
+    const mk = (kind, label) => {
+      const a = document.createElement("a");
+      a.className = "btn ghost";
+      a.href =
+        "/api/download?date=" + encodeURIComponent(dateStr) + "&kind=" + kind;
+      a.setAttribute("download", "");
+      a.textContent = label;
+      return a;
+    };
+    els.reportDownloads.appendChild(mk("md", "⬇ Markdown (.md)"));
+    els.reportDownloads.appendChild(mk("docx", "⬇ Word (.docx)"));
+  }
+
   function renderReport(payload) {
     const markdown = payload.markdown || "";
     const imageBase = payload.image_base || "";
@@ -399,6 +415,7 @@
     els.reportMeta.textContent =
       "data/" + payload.date + "/report/daily_report.md · 客戶端渲染";
     els.reportHint.textContent = payload.date;
+    renderDownloads(payload.date);
 
     const hasLibs =
       typeof window.marked !== "undefined" && typeof window.DOMPurify !== "undefined";

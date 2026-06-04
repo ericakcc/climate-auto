@@ -164,6 +164,42 @@ def test_report_route_missing_returns_404(client, data_dir: Path) -> None:
     assert resp.status_code == 404
 
 
+def test_download_md_serves_as_attachment(client, data_dir: Path) -> None:
+    report_dir = make_report_dir(data_dir, "2026-06-04")
+    (report_dir / "daily_report.md").write_text("# Report")
+
+    resp = client.get("/api/download", params={"date": "2026-06-04", "kind": "md"})
+
+    assert resp.status_code == 200
+    assert "attachment" in resp.headers["content-disposition"]
+    assert "2026-06-04" in resp.headers["content-disposition"]
+
+
+def test_download_docx_serves(client, data_dir: Path) -> None:
+    report_dir = make_report_dir(data_dir, "2026-06-04")
+    (report_dir / "daily_report.docx").write_bytes(b"PK\x03\x04 fake docx")
+
+    resp = client.get("/api/download", params={"date": "2026-06-04", "kind": "docx"})
+
+    assert resp.status_code == 200
+
+
+def test_download_unknown_kind_returns_400(client, data_dir: Path) -> None:
+    make_report_dir(data_dir, "2026-06-04")
+
+    resp = client.get("/api/download", params={"date": "2026-06-04", "kind": "pdf"})
+
+    assert resp.status_code == 400
+
+
+def test_download_missing_file_returns_404(client, data_dir: Path) -> None:
+    make_report_dir(data_dir, "2026-06-04")
+
+    resp = client.get("/api/download", params={"date": "2026-06-04", "kind": "md"})
+
+    assert resp.status_code == 404
+
+
 def test_job_status_idle(client) -> None:
     resp = client.get("/api/job")
 
