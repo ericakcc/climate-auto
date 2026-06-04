@@ -56,6 +56,8 @@
     jobKind: null, // "collect" | "extract" | "synthesize"
     running: false,
     loadedDate: null, // date whose blocks are currently shown
+    loadSeq: 0, // monotonic token; stale async loads are ignored
+    dirty: false, // unsaved textarea edits present
   };
 
   // ---- small helpers ------------------------------------------------------
@@ -210,6 +212,7 @@
 
   // ---- extraction blocks --------------------------------------------------
   function renderPlaceholder(big, sub) {
+    state.dirty = false; // no editable content shown
     els.blocks.innerHTML = "";
     const card = document.createElement("div");
     card.className = "page placeholder-card";
@@ -289,7 +292,10 @@
     ta.dataset.exists = block.exists ? "1" : "0";
     ta.dataset.imageUrl = block.image_url == null ? "" : block.image_url;
     autoGrow(ta);
-    ta.addEventListener("input", () => autoGrow(ta));
+    ta.addEventListener("input", () => {
+      autoGrow(ta);
+      state.dirty = true;
+    });
     grid.appendChild(ta);
 
     card.appendChild(grid);
@@ -301,13 +307,16 @@
     ta.style.height = Math.max(120, ta.scrollHeight + 2) + "px";
   }
 
-  async function loadExtractions(dateStr) {
+  async function loadExtractions(dateStr, seq) {
     if (!dateStr) {
       showNotice("warn", "請先選擇一個資料日期。");
       return;
     }
+    if (seq == null) seq = ++state.loadSeq;
     els.blocksHint.textContent = "載入中…";
     const res = await fetchJSON("/api/extractions?date=" + encodeURIComponent(dateStr));
+    // Ignore a stale response if the user has since switched dates.
+    if (seq !== state.loadSeq) return;
 
     if (res.status === 404) {
       state.loadedDate = dateStr;
@@ -335,6 +344,7 @@
     blocks.forEach((b) => frag.appendChild(buildBlockCard(b)));
     els.blocks.appendChild(frag);
     els.blocksHint.textContent = dateStr + " · " + blocks.length + " 個區塊";
+    state.dirty = false; // freshly loaded = no unsaved edits
   }
 
   async function saveExtractions() {
@@ -372,6 +382,7 @@
       const count = res.body && res.body.count != null ? res.body.count : blocks.length;
       showNotice("ok", "已儲存 " + count + " 個區塊 ✓");
       els.saveHint.textContent = "已儲存於 " + (new Date()).toLocaleTimeString() + "。";
+      state.dirty = false;
     } catch (err) {
       showNotice("err", "儲存失敗：" + (err && err.message ? err.message : err));
       els.saveHint.textContent = prevHint;
@@ -382,9 +393,11 @@
   }
 
   // ---- rendered report ----------------------------------------------------
-  async function loadReport(dateStr) {
+  async function loadReport(dateStr, seq) {
     if (!dateStr) return;
+    if (seq == null) seq = state.loadSeq;
     const res = await fetchJSON("/api/report?date=" + encodeURIComponent(dateStr));
+    if (seq !== state.loadSeq) return; // a newer load superseded this one
     if (res.status === 404) {
       // No report generated for this date yet — hide the section quietly.
       els.reportSection.classList.add("hidden");
@@ -399,9 +412,13 @@
   }
 
   // Load both the editable extractions and the rendered report for a date.
+  // A single sequence token covers both fetches so a quick date switch can't
+  // let a slow earlier response overwrite the newer selection.
   async function showDate(dateStr) {
-    await loadExtractions(dateStr);
-    await loadReport(dateStr);
+    const seq = ++state.loadSeq;
+    await loadExtractions(dateStr, seq);
+    if (seq !== state.loadSeq) return;
+    await loadReport(dateStr, seq);
   }
 
   function renderDownloads(dateStr) {
@@ -530,10 +547,11 @@
         setLogState("err", "錯誤 ERROR");
         finishJob(kind, null, true);
       } else if (es.readyState === EventSource.CLOSED) {
-        // connection closed unexpectedly — recover the UI so buttons aren't stuck.
-        logSystem("連線中斷。");
-        setLogState("idle", "中斷");
-        endRun();
+        // Stream closed without a terminal event — find out what really
+        // happened instead of leaving the UI guessing.
+        logSystem("連線中斷，確認任務狀態…");
+        closeStream();
+        reconcileAfterDrop(kind);
       }
     });
   }
@@ -541,6 +559,20 @@
   function endRun() {
     closeStream();
     setRunning(false, null);
+  }
+
+  // The SSE stream dropped without a done/error frame. Ask the server whether
+  // the job is still running (reconnect) or finished (recover artifacts).
+  async function reconcileAfterDrop(kind) {
+    const res = await fetchJSON("/api/job");
+    if (res.ok && res.body && res.body.running && res.body.job_id) {
+      connectStream(res.body.job_id, res.body.kind || kind);
+      return;
+    }
+    setLogState("idle", "中斷（已恢復）");
+    setRunning(false, null);
+    await loadDates(currentDate());
+    await showDate(currentDate());
   }
 
   async function finishJob(kind, doneData, errored) {
@@ -572,6 +604,13 @@
     if (!dateStr) {
       showNotice("warn", "請先選擇一個資料日期。");
       return;
+    }
+    if (state.dirty && (kind === "extract" || kind === "synthesize")) {
+      const msg =
+        kind === "extract"
+          ? "你有未儲存的編輯。Extract 會重新產生萃取並覆蓋它們。仍要繼續？"
+          : "你有未儲存的編輯。Synthesize 只會使用『已儲存』的版本（不含未存編輯）。仍要繼續？";
+      if (!window.confirm(msg)) return;
     }
     hideNotice();
     const payload = { date: dateStr, numeric: !!els.numericChk.checked };
