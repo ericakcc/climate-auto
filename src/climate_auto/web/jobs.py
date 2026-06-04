@@ -89,9 +89,7 @@ class JobManager:
         try:
             loop = asyncio.get_running_loop()
             sink_id = self._attach_sink(record.queue, loop, job_id)
-            record.task = asyncio.create_task(
-                self._run(record, coro_factory, sink_id)
-            )
+            record.task = asyncio.create_task(self._run(record, coro_factory, sink_id))
         except Exception:
             self._current = None
             raise

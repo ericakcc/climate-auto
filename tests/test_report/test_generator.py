@@ -152,16 +152,12 @@ class TestExtractionsPersistence:
 class TestExtractOnlyMode:
     """Tests for extract_only mode in generate_report."""
 
-    async def test_extract_only_saves_extractions_json(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_extract_only_saves_extractions_json(self, tmp_path: Path) -> None:
         target = date(2026, 3, 19)
         base_dir = _setup_fake_data(tmp_path, target)
         analyzer = PlaceholderAnalyzer()
 
-        await generate_report(
-            base_dir, target, analyzer=analyzer, extract_only=True
-        )
+        await generate_report(base_dir, target, analyzer=analyzer, extract_only=True)
 
         # PlaceholderAnalyzer returns empty strings, so no extractions saved
         # but the report should still be generated
@@ -185,9 +181,7 @@ class TestExtractOnlyMode:
 class TestSynthesizeOnlyMode:
     """Tests for synthesize_only mode in generate_report."""
 
-    async def test_synthesize_only_loads_extractions(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_synthesize_only_loads_extractions(self, tmp_path: Path) -> None:
         target = date(2026, 3, 19)
         base_dir = _setup_fake_data(tmp_path, target)
         report_dir = base_dir / "2026-03-19" / "report"
@@ -207,9 +201,7 @@ class TestSynthesizeOnlyMode:
         # Per-chart extraction should appear in the report
         assert "人工修正的分析" in content
 
-    async def test_synthesize_only_missing_file_raises(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_synthesize_only_missing_file_raises(self, tmp_path: Path) -> None:
         target = date(2026, 3, 19)
         base_dir = _setup_fake_data(tmp_path, target)
         analyzer = PlaceholderAnalyzer()
