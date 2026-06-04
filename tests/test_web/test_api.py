@@ -141,3 +141,18 @@ def test_job_status_idle(client) -> None:
 
     assert resp.status_code == 200
     assert resp.json()["running"] is False
+
+
+def test_index_serves_editor_page(client) -> None:
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "Climate Auto" in resp.text
+    assert 'id="app"' in resp.text
+
+
+def test_static_editor_js_is_served(client) -> None:
+    resp = client.get("/static/editor.js")
+
+    assert resp.status_code == 200

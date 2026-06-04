@@ -5,15 +5,26 @@ from pathlib import Path
 from typing import Any
 
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.requests import Request
+from starlette.responses import FileResponse
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from climate_auto.config import Settings, load_settings
 from climate_auto.web import api
 from climate_auto.web.jobs import JobManager
 
 DEFAULT_CONFIG_PATH = Path("config/settings.yaml")
+_WEB_DIR = Path(__file__).parent
+_TEMPLATES_DIR = _WEB_DIR / "templates"
+_STATIC_DIR = _WEB_DIR / "static"
 
 AnalyzerFactory = Callable[[Settings], Any]
+
+
+async def _index(request: Request) -> FileResponse:
+    """Serve the single-page editor."""
+    return FileResponse(_TEMPLATES_DIR / "editor.html", media_type="text/html")
 
 
 def _default_analyzer_factory(settings: Settings) -> Any:
@@ -44,6 +55,8 @@ def build_app(
     resolved_data_dir = (data_dir or settings.data_dir).resolve()
 
     routes = [
+        Route("/", _index, methods=["GET"]),
+        Mount("/static", StaticFiles(directory=_STATIC_DIR), name="static"),
         Route("/api/dates", api.list_dates, methods=["GET"]),
         Route("/api/extractions", api.get_extractions, methods=["GET"]),
         Route("/api/extractions", api.put_extractions, methods=["PUT"]),
