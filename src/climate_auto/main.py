@@ -227,8 +227,7 @@ def main() -> None:
         "--synthesize",
         action="store_true",
         default=False,
-        help="Phase 2 only: load extractions.md, synthesize diagnosis, "
-        "render report.",
+        help="Phase 2 only: load extractions.md, synthesize diagnosis, render report.",
     )
     parser.add_argument(
         "--numeric",
@@ -236,7 +235,30 @@ def main() -> None:
         help="Enable the numeric (ECMWF) route: compute height/moisture/forecast-"
         "sounding fields and merge into extractions instead of reading those GIFs.",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Launch the local web editor instead of running the pipeline.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Port for --serve (default 8765).",
+    )
     args = parser.parse_args()
+
+    # Launch the local web editor and exit (requires the `web` extra).
+    if args.serve:
+        try:
+            from climate_auto.web.server import run_server
+        except ImportError as exc:
+            raise SystemExit(
+                "Web editor not available. Run: uv sync --extra web"
+            ) from exc
+        config_path = Path(args.config) if args.config else Path("config/settings.yaml")
+        run_server(port=args.port, config_path=config_path)
+        return
 
     # Determine target date
     if args.date:
