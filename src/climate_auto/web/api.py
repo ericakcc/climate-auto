@@ -12,6 +12,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from climate_auto.config import Settings, load_settings
+from climate_auto.report.numeric import NUMERIC_MARKER, OBSERVATION_MARKER
 from climate_auto.report.generator import (
     generate_report,
     load_extractions,
@@ -62,9 +63,9 @@ def _provenance(key: str, text: str) -> str:
         "numeric", "observation", or "vision".
     """
     head = text.lstrip()
-    if head.startswith("（數值觀測"):
+    if head.startswith(OBSERVATION_MARKER):
         return "observation"
-    if head.startswith("（數值計算") or key.startswith("numeric/"):
+    if head.startswith(NUMERIC_MARKER) or key.startswith("numeric/"):
         return "numeric"
     return "vision"
 
@@ -93,7 +94,7 @@ async def list_dates(request: Request) -> JSONResponse:
 async def get_extractions(request: Request) -> JSONResponse:
     """Return the editable extraction blocks for a date."""
     date_str = request.query_params.get("date", "")
-    if not _DATE_RE.match(date_str):
+    if _parse_date(date_str) is None:
         return JSONResponse({"detail": "invalid date"}, status_code=400)
 
     report_dir = _report_dir(request, date_str)
@@ -121,7 +122,7 @@ async def put_extractions(request: Request) -> JSONResponse:
     """Persist edited extraction blocks back to extractions.md."""
     body = await request.json()
     req = SaveExtractionsRequest.model_validate(body)
-    if not _DATE_RE.match(req.date):
+    if _parse_date(req.date) is None:
         return JSONResponse({"detail": "invalid date"}, status_code=400)
 
     report_dir = _report_dir(request, req.date)
@@ -149,7 +150,7 @@ async def get_image(request: Request) -> Response:
 async def get_report(request: Request) -> JSONResponse:
     """Return the rendered daily-report markdown for client-side rendering."""
     date_str = request.query_params.get("date", "")
-    if not _DATE_RE.match(date_str):
+    if _parse_date(date_str) is None:
         return JSONResponse({"detail": "invalid date"}, status_code=400)
 
     report_path = _report_dir(request, date_str) / _DAILY_REPORT
@@ -178,7 +179,7 @@ async def download(request: Request) -> Response:
     """Serve the generated report file as a download attachment."""
     date_str = request.query_params.get("date", "")
     kind = request.query_params.get("kind", "")
-    if not _DATE_RE.match(date_str):
+    if _parse_date(date_str) is None:
         return JSONResponse({"detail": "invalid date"}, status_code=400)
     if kind not in _DOWNLOADS:
         return JSONResponse({"detail": "invalid kind"}, status_code=400)
@@ -222,22 +223,31 @@ async def _start_job(
     return JSONResponse(JobStartedResponse(job_id=job_id).model_dump())
 
 
-def _build_analyzer(request: Request, settings: Settings) -> Any:
-    """Build the analyzer, mapping a missing llm extra to a clear error."""
-    return request.app.state.analyzer_factory(settings)
+def _parse_date(date_str: str) -> date_cls | None:
+    """Parse a strict YYYY-MM-DD date string, or None if malformed/invalid.
+
+    Guards against format-valid but impossible dates (e.g. 2026-13-45) that
+    would otherwise raise ValueError deep in a handler and surface as a 500.
+    """
+    if not _DATE_RE.match(date_str):
+        return None
+    try:
+        return date_cls.fromisoformat(date_str)
+    except ValueError:
+        return None
 
 
 async def post_collect(request: Request) -> JSONResponse:
     """Start a data-collection job."""
     req = RunRequest.model_validate(await request.json())
-    if not _DATE_RE.match(req.date):
+    target = _parse_date(req.date)
+    if target is None:
         return JSONResponse({"detail": "invalid date"}, status_code=400)
 
     from climate_auto.main import run_collection
     from climate_auto.models import SourceName
 
     settings = _load_run_settings(request)
-    target = date_cls.fromisoformat(req.date)
     numerical = settings.numerical
     if req.numeric:
         numerical = numerical.model_copy(update={"enabled": True})
@@ -274,19 +284,19 @@ async def _run_report_job(
     synthesize_only: bool = False,
 ) -> JSONResponse:
     req = RunRequest.model_validate(await request.json())
-    if not _DATE_RE.match(req.date):
+    target = _parse_date(req.date)
+    if target is None:
         return JSONResponse({"detail": "invalid date"}, status_code=400)
 
     settings = _load_run_settings(request)
     try:
-        analyzer = _build_analyzer(request, settings)
+        analyzer = request.app.state.analyzer_factory(settings)
     except ImportError:
         return JSONResponse(
             {"detail": "LLM support not installed. Run: uv sync --extra llm"},
             status_code=400,
         )
 
-    target = date_cls.fromisoformat(req.date)
     numerical = settings.numerical
     if req.numeric:
         numerical = numerical.model_copy(update={"enabled": True})

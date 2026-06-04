@@ -94,6 +94,13 @@ def test_get_extractions_missing_report_dir_returns_404(client) -> None:
     assert resp.status_code == 404
 
 
+def test_get_extractions_impossible_date_returns_400(client) -> None:
+    # Format-valid but impossible date must be 400 (not 404 or a 500 crash).
+    resp = client.get("/api/extractions", params={"date": "2026-13-45"})
+
+    assert resp.status_code == 400
+
+
 def test_save_then_load_extractions_round_trip(client, data_dir: Path) -> None:
     report_dir = make_report_dir(data_dir, "2026-06-04")
     payload = {

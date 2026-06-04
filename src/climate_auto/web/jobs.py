@@ -19,6 +19,7 @@ from loguru import logger
 from climate_auto.web.schemas import JobStatusResponse
 
 _HEARTBEAT_SECONDS = 15.0
+_MAX_RECENT_JOBS = 16
 
 CoroFactory = Callable[[], Awaitable[Any]]
 
@@ -80,11 +81,20 @@ class JobManager:
 
         job_id = uuid.uuid4().hex
         record = JobRecord(job_id=job_id, kind=kind, date=date)
-        self._current = record  # set synchronously: guards against re-entry
-
-        loop = asyncio.get_running_loop()
-        sink_id = self._attach_sink(record.queue, loop, job_id)
-        record.task = asyncio.create_task(self._run(record, coro_factory, sink_id))
+        # Claim the slot synchronously. This is the single-job guard: there is
+        # no `await` between the check above and this assignment, so two
+        # concurrent start() calls cannot both pass. Release the slot if setup
+        # below fails, otherwise the manager would be wedged "busy" forever.
+        self._current = record
+        try:
+            loop = asyncio.get_running_loop()
+            sink_id = self._attach_sink(record.queue, loop, job_id)
+            record.task = asyncio.create_task(
+                self._run(record, coro_factory, sink_id)
+            )
+        except Exception:
+            self._current = None
+            raise
         return job_id
 
     def _attach_sink(
@@ -123,13 +133,16 @@ class JobManager:
     ) -> None:
         terminal: dict
         try:
+            # Run (and log any failure) inside the job's logging context so the
+            # traceback is captured by the per-job sink and reaches the SSE feed.
             with logger.contextualize(job=record.job_id):
-                result = await coro_factory()
-            payload = result if isinstance(result, dict) else {}
-            terminal = {"type": "done", "data": payload}
-        except Exception as exc:  # noqa: BLE001 - surfaced to the client as an event
-            logger.exception("Job {} ({}) failed", record.job_id, record.kind)
-            terminal = {"type": "error", "data": {"message": str(exc)}}
+                try:
+                    result = await coro_factory()
+                    payload = result if isinstance(result, dict) else {}
+                    terminal = {"type": "done", "data": payload}
+                except Exception as exc:  # noqa: BLE001 - surfaced as an event
+                    logger.exception("Job {} ({}) failed", record.job_id, record.kind)
+                    terminal = {"type": "error", "data": {"message": str(exc)}}
         finally:
             logger.remove(sink_id)
 
@@ -138,7 +151,14 @@ class JobManager:
         record.queue.put_nowait(terminal)
         record.queue.put_nowait(None)
         self._recent[record.job_id] = record
+        self._prune_recent()
         self._current = None
+
+    def _prune_recent(self) -> None:
+        """Cap retained finished jobs so memory doesn't grow unbounded."""
+        while len(self._recent) > _MAX_RECENT_JOBS:
+            oldest = next(iter(self._recent))
+            del self._recent[oldest]
 
     def _lookup(self, job_id: str) -> JobRecord | None:
         if self._current is not None and self._current.job_id == job_id:
@@ -168,19 +188,32 @@ class JobManager:
         queue = record.queue
         yield ": connected\n\n"
 
-        while True:
-            if record.done and queue.empty():
-                if record.terminal is not None:
-                    yield _format_event(record.terminal)
-                break
-            try:
-                item = await asyncio.wait_for(queue.get(), timeout=_HEARTBEAT_SECONDS)
-            except TimeoutError:
-                yield ": keep-alive\n\n"
-                continue
-            if item is None:
-                break
-            yield _format_event(item)
+        # Hold a single pending get across heartbeats. Using asyncio.wait (not
+        # wait_for) means a timeout does NOT cancel the get, so an item arriving
+        # exactly at the heartbeat boundary is never dropped.
+        pending: asyncio.Task | None = None
+        try:
+            while True:
+                if pending is None and record.done and queue.empty():
+                    # Reconnect after the queue was already drained: replay the
+                    # terminal event so a late client still sees the outcome.
+                    if record.terminal is not None:
+                        yield _format_event(record.terminal)
+                    break
+                if pending is None:
+                    pending = asyncio.ensure_future(queue.get())
+                done, _ = await asyncio.wait({pending}, timeout=_HEARTBEAT_SECONDS)
+                if pending not in done:
+                    yield ": keep-alive\n\n"
+                    continue
+                item = pending.result()
+                pending = None
+                if item is None:
+                    break
+                yield _format_event(item)
+        finally:
+            if pending is not None:
+                pending.cancel()
 
 
 def _format_event(item: dict) -> str:

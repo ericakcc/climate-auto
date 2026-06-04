@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 from loguru import logger
 from pydantic import BaseModel
+from climate_auto.report.numeric import OBSERVATION_MARKER
 
 _O_A0001 = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
 
@@ -132,7 +133,7 @@ def format_station_obs(obs_list: list[StationObs]) -> str:
         return "（CWA 地面測站：無匹配站點資料）"
 
     time = next((o.obs_time for o in obs_list if o.obs_time), "")
-    lines = [f"（數值觀測，CWA 地面測站，{time}）"]
+    lines = [f"{OBSERVATION_MARKER}，CWA 地面測站，{time}）"]
     for o in obs_list:
 
         def _n(v: float | None, unit: str) -> str:

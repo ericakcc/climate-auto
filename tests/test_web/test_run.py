@@ -129,6 +129,15 @@ async def test_concurrent_run_returns_409(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_endpoints_reject_impossible_date(tmp_path: Path) -> None:
+    app = _make_app(tmp_path, lambda s: PlaceholderAnalyzer())
+    async with _client(app) as ac:
+        for path in ("/api/collect", "/api/extract", "/api/synthesize"):
+            resp = await ac.post(path, json={"date": "2026-13-45"})
+            assert resp.status_code == 400, path
+
+
+@pytest.mark.asyncio
 async def test_stream_unknown_job_returns_404(tmp_path: Path) -> None:
     app = _make_app(tmp_path, lambda s: PlaceholderAnalyzer())
 

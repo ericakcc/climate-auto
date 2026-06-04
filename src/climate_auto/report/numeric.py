@@ -32,6 +32,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from climate_auto.report.forecast import HeightFieldFeatures
 
 
+# Leading provenance markers embedded in a block's TEXT. extractions.md is a
+# flat key->text file with nowhere to store structured provenance, so
+# web.api._provenance matches these prefixes. Keep producers and that matcher
+# pointing at these same constants.
+NUMERIC_MARKER = "（數值計算"
+OBSERVATION_MARKER = "（數值觀測"
+
+
 def format_sounding_indices(idx: SoundingIndices) -> str:
     """Format forecast/observed sounding indices as a Traditional-Chinese block.
 
@@ -46,7 +54,7 @@ def format_sounding_indices(idx: SoundingIndices) -> str:
         return "n/a" if value is None else f"{value:.1f}{unit}"
 
     return (
-        f"（數值計算，來源 {idx.source}，{idx.label}，{idx.valid_time:%Y-%m-%d %HZ}）\n"
+        f"{NUMERIC_MARKER}，來源 {idx.source}，{idx.label}，{idx.valid_time:%Y-%m-%d %HZ}）\n"
         f"- 不穩定度：SBCAPE {_n(idx.sbcape, ' J/kg')}、CIN {_n(idx.sbcin, ' J/kg')}、"
         f"MUCAPE {_n(idx.mucape, ' J/kg')}\n"
         f"- 穩定度指數：LI {_n(idx.lifted_index)}、K {_n(idx.k_index)}、"
@@ -67,7 +75,7 @@ def format_height_features(feat: "HeightFieldFeatures") -> str:
         Multi-line text summary.
     """
     lines = [
-        f"（數值計算，{feat.level_hpa}hPa 高度場，{feat.valid_time:%Y-%m-%d %HZ}）",
+        f"{NUMERIC_MARKER}，{feat.level_hpa}hPa 高度場，{feat.valid_time:%Y-%m-%d %HZ}）",
     ]
     if feat.high_center_gpm is not None:
         lines.append(
@@ -105,7 +113,7 @@ def format_moisture_flux(da: "xr.DataArray", valid_time: datetime) -> str:
     lons = da["longitude"].values
     i, j = np.unravel_index(np.nanargmax(vals), vals.shape)
     return (
-        f"（數值計算，850hPa 水氣通量 q×風速，{valid_time:%Y-%m-%d %HZ}）\n"
+        f"{NUMERIC_MARKER}，850hPa 水氣通量 q×風速，{valid_time:%Y-%m-%d %HZ}）\n"
         f"- 區域平均 {np.nanmean(vals):.1f}、最大 {np.nanmax(vals):.1f} "
         f"{da.attrs.get('units', '')}\n"
         f"- 最大值位於 {float(lats[i]):.1f}N, {float(lons[j]):.1f}E"
@@ -141,7 +149,7 @@ def format_precip(
     lat_sel = (lats >= lat_min) & (lats <= lat_max)
     lon_sel = (lons >= lon_min) & (lons <= lon_max)
     if not lat_sel.any() or not lon_sel.any():
-        return f"（數值計算，累積雨量，至 {valid_time:%Y-%m-%d %HZ}）\n- 分析範圍外，無資料"
+        return f"{NUMERIC_MARKER}，累積雨量，至 {valid_time:%Y-%m-%d %HZ}）\n- 分析範圍外，無資料"
 
     sub = da.values[np.ix_(lat_sel, lon_sel)]
     lats_d = lats[lat_sel]
@@ -150,7 +158,7 @@ def format_precip(
     ip = int(np.argmin(np.abs(lats - point[0])))
     jp = int(np.argmin(np.abs(lons - point[1])))
     return (
-        f"（數值計算，台灣區域累積雨量，至 {valid_time:%Y-%m-%d %HZ}）\n"
+        f"{NUMERIC_MARKER}，台灣區域累積雨量，至 {valid_time:%Y-%m-%d %HZ}）\n"
         f"- 區域最大 {float(sub[i, j]):.1f} mm，位於 "
         f"{float(lats_d[i]):.1f}N, {float(lons_d[j]):.1f}E\n"
         f"- 參考點 ({point[0]:g}N,{point[1]:g}E) 累積 "
@@ -164,7 +172,7 @@ def format_level_humidity(
     """Format a pressure-level relative-humidity summary block."""
     dry_wet = "偏乾" if mean_rh < 50 else ("偏濕" if mean_rh > 70 else "中性")
     return (
-        f"（數值計算，{level}hPa 相對濕度，{valid_time:%Y-%m-%d %HZ}）\n"
+        f"{NUMERIC_MARKER}，{level}hPa 相對濕度，{valid_time:%Y-%m-%d %HZ}）\n"
         f"- 區域平均 RH {mean_rh:.0f}%（{dry_wet}）、台灣點 RH {point_rh:.0f}%"
     )
 

@@ -6,7 +6,7 @@ import json
 import pytest
 from loguru import logger
 
-from climate_auto.web.jobs import JobBusyError, JobManager
+from climate_auto.web.jobs import _MAX_RECENT_JOBS, JobBusyError, JobManager
 
 
 def _parse_sse(chunks: list[str]) -> list[dict]:
@@ -115,6 +115,20 @@ async def test_reconnect_after_completion_replays_terminal_event() -> None:
     # not hang, even though the queue was already fully consumed.
     second = await asyncio.wait_for(_drain(manager, job_id), timeout=1.0)
     assert any(e["type"] == "done" for e in second)
+
+
+@pytest.mark.asyncio
+async def test_recent_jobs_are_capped() -> None:
+    manager = JobManager()
+
+    async def _work() -> dict:
+        return {}
+
+    for _ in range(_MAX_RECENT_JOBS + 5):
+        job_id = await manager.start("collect", "2026-06-04", _work)
+        await _drain(manager, job_id)
+
+    assert len(manager._recent) <= _MAX_RECENT_JOBS
 
 
 @pytest.mark.asyncio
