@@ -1,5 +1,6 @@
 """Main report generator: discovery + analyzer + Jinja2 rendering."""
 
+import asyncio
 import re
 from datetime import date
 from pathlib import Path
@@ -451,8 +452,10 @@ async def generate_report(
                     if any(p in chart.relative_path for p in patterns)
                 }
                 all_charts = _drop_replaced_charts(all_charts, patterns)
-                numeric_extractions = _build_numeric_or_empty(
-                    target_date, numerical, cwa_api_key
+                # ECMWF/CWA downloads block; keep them off the event loop so a
+                # web server stays responsive (SSE heartbeats, other requests).
+                numeric_extractions = await asyncio.to_thread(
+                    _build_numeric_or_empty, target_date, numerical, cwa_api_key
                 )
                 # Attach each numeric block to the chart section it replaces, so
                 # the section shows numbers instead of "待分析".
@@ -480,10 +483,13 @@ async def generate_report(
     output_path.write_text(rendered, encoding="utf-8")
     logger.info("Report generated: {}", output_path)
 
-    # Generate DOCX report from the rendered Markdown
+    # Generate DOCX report from the rendered Markdown (sync python-docx work;
+    # run off the event loop so it doesn't block a web server).
     from climate_auto.report.docx_exporter import generate_docx_from_markdown
 
-    docx_path = generate_docx_from_markdown(output_path, report_dir)
+    docx_path = await asyncio.to_thread(
+        generate_docx_from_markdown, output_path, report_dir
+    )
     logger.info("DOCX report generated: {}", docx_path)
 
     return output_path
