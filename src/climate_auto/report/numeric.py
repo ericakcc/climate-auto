@@ -233,9 +233,15 @@ def build_numeric_extractions(
     extractions: dict[str, str] = {}
 
     with TemporaryDirectory() as tmp:
+        logger.info(
+            "Numeric route: downloading ECMWF pressure levels for steps {} "
+            "(each download can take ~30s, no per-byte progress)",
+            list(steps),
+        )
         for step in steps:
             valid = _valid_time(target_date, run_time, step)
             label = _step_label(step)
+            logger.info("Downloading ECMWF pressure levels: step {} ({})", step, label)
             try:
                 grib = fetch_ecmwf_pressure_levels(
                     Path(tmp) / f"ec_{step}.grib2",
@@ -247,6 +253,7 @@ def build_numeric_extractions(
             except Exception as exc:  # noqa: BLE001 - network/decoding/archive errors
                 logger.warning("ECMWF fetch failed for step {}: {}", step, exc)
                 continue
+            logger.info("Computing numeric fields: step {} ({})", step, label)
 
             try:
                 feat = height_field_features(
@@ -285,8 +292,10 @@ def build_numeric_extractions(
                     logger.warning("Forecast sounding failed (step {}): {}", step, exc)
 
         # --- Daily precipitation (ECMWF tp), report 2-III / 3-IV ---
+        logger.info("Numeric route: downloading ECMWF precipitation (tp)")
         tp_by_step: dict[int, object] = {}
         for step in steps:
+            logger.info("Downloading ECMWF tp: step {}", step)
             try:
                 grib = fetch_ecmwf_surface(
                     Path(tmp) / f"tp_{step}.grib2",
@@ -312,6 +321,7 @@ def build_numeric_extractions(
 
     # --- Observed surface stations (CWA OpenData), report 1-IV ---
     if cwa_api_key and surface_stations:
+        logger.info("Fetching CWA surface station observations: {}", surface_stations)
         try:
             from climate_auto.report.cwa import fetch_cwa_surface, format_station_obs
 
